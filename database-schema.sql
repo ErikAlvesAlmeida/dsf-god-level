@@ -234,3 +234,5 @@ CREATE TABLE coupon_sales (
     target VARCHAR(100),
     sponsorship VARCHAR(100)
 );
+
+INSERT INTO brands (name) VALUES ('Nola God Level Brand');
