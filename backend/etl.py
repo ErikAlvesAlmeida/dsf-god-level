@@ -4,8 +4,6 @@ import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 
-# Query SQL para "achatar" (flatten) os dados.
-# Esta é a nossa transformação (o "T" do ETL).
 FLATTEN_SALES_QUERY = """
 WITH sales_base AS (
     SELECT
@@ -57,7 +55,6 @@ products_base AS (
         ps.total_price AS product_total_price,
         
         -- Agregando customizações (items)
-        -- Usamos LEFT JOIN para incluir produtos que NÃO têm items
         STRING_AGG(i.name, ', ') AS items_names,
         SUM(ips.additional_price) AS items_total_additional_price
     FROM
@@ -86,54 +83,89 @@ JOIN
 ;
 """
 
-def extract_from_postgres(query: str, db_url: str) -> pd.DataFrame:
-    """Extrai dados do PostgreSQL e retorna um DataFrame."""
-    print("Conectando ao PostgreSQL...")
+def process_etl_in_chunks(db_url: str, duckdb_file: str, table_name: str, chunk_size: int = 100000):
+    """
+    Executa o ETL processando os dados em "chunks" (pedaços)
+    para evitar o esgotamento de memória RAM.
+    """
+    print("Iniciando processo ETL em modo 'chunked' (otimizado para RAM)...")
+    
+    conn_pg = None
+    conn_duckdb = None
+    
     try:
-        conn = psycopg2.connect(db_url)
-        print("Conexão estabelecida. Extraindo dados (isso pode levar alguns minutos)...")
+        # 1. Conectar ao PostgreSQL (Fonte)
+        print("Conectando ao PostgreSQL...")
+        conn_pg = psycopg2.connect(db_url)
+        print("✓ Conexão com PostgreSQL estabelecida.")
+
+        # 2. Conectar ao DuckDB (Destino)
+        print(f"Conectando ao DuckDB (arquivo: {duckdb_file})...")
+        conn_duckdb = duckdb.connect(database=duckdb_file, read_only=False)
+        print("✓ Conexão com DuckDB estabelecida.")
         
-        # pd.read_sql para carregar dados diretamente em um DataFrame
-        df = pd.read_sql_query(query, conn)
+        is_first_chunk = True
         
-        print(f"✓ Extração concluída. {len(df)} linhas de 'product_sales' achatadas.")
-        return df
+        # 3. Criar um iterador de chunks do Pandas
+        print(f"Iniciando extração do PostgreSQL em chunks de {chunk_size} linhas...")
+        
+        # pd.read_sql_query com 'chunksize' retorna um iterador
+        chunk_iterator = pd.read_sql_query(
+            FLATTEN_SALES_QUERY,
+            conn_pg,
+            chunksize=chunk_size
+        )
+        
+        total_rows = 0
+        
+        # 4. Loop de processamento de cada chunk
+        for i, chunk_df in enumerate(chunk_iterator):
+            if chunk_df.empty:
+                print(f"Chunk {i+1} está vazio. Finalizando.")
+                break
+                
+            print(f"  > Processando Chunk {i+1} ({len(chunk_df)} linhas)...")
+            
+            # Registra o chunk atual no DuckDB como uma tabela temporária
+            conn_duckdb.register('chunk_temp', chunk_df)
+            
+            if is_first_chunk:
+                # Na primeira vez, CRIA a tabela permanente
+                conn_duckdb.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM chunk_temp")
+                print(f"  ✓ Tabela '{table_name}' criada com o primeiro chunk.")
+                is_first_chunk = False
+            else:
+                # Nas próximas, apenas ANEXA (append) os dados
+                conn_duckdb.execute(f"INSERT INTO {table_name} SELECT * FROM chunk_temp")
+                print(f"  ✓ Chunk {i+1} anexado à tabela '{table_name}'.")
+            
+            total_rows += len(chunk_df)
+
+        if total_rows == 0:
+             print("Nenhum dado foi processado. Verifique a query e o banco de dados.")
+             return
+
+        print("\n--- Processo ETL concluído com sucesso! ---")
+        
+        # 5. Verificação Final
+        count_result = conn_duckdb.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+        if count_result:
+            print(f"✓ Verificação: {count_result[0]} linhas totais na tabela '{table_name}'.")
+        
     except Exception as e:
-        print(f"Erro ao conectar ou extrair do PostgreSQL: {e}")
-        return pd.DataFrame() # Retorna DF vazio em caso de erro
+        print(f"\n--- ERRO DURANTE O PROCESSO ETL ---")
+        print(f"Erro: {e}")
+    
     finally:
-        if 'conn' in locals() and conn:
-            conn.close()
+        # 6. Fechar conexões
+        if conn_pg:
+            conn_pg.close()
             print("Conexão com PostgreSQL fechada.")
-
-def load_to_duckdb(df: pd.DataFrame, db_file: str, table_name: str):
-    """Carrega um DataFrame em uma tabela do DuckDB."""
-    if df.empty:
-        print("DataFrame vazio. Nenhum dado para carregar.")
-        return
-
-    print(f"Conectando ao DuckDB (arquivo: {db_file})...")
-    conn = duckdb.connect(db_file)
-    print("Conexão estabelecida. Carregando dados...")
-    
-    # Registra o DataFrame como uma "tabela virtual"
-    conn.register('df_temp', df)
-    
-    # Persiste os dados em uma tabela física no arquivo DuckDB
-    # Isso é o que garante a performance
-    conn.execute(f"CREATE OR REPLACE TABLE {table_name} AS SELECT * FROM df_temp")
-    
-    print(f"✓ Dados carregados na tabela '{table_name}'.")
-    
-    # Verificação
-    count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-    print(f"✓ Verificação: {count} linhas inseridas no DuckDB.")
-    
-    conn.close()
-    print("Conexão com DuckDB fechada.")
+        if conn_duckdb:
+            conn_duckdb.close()
+            print("Conexão com DuckDB fechada.")
 
 def main():
-    """Função principal do pipeline ETL."""
     load_dotenv() # Carrega variáveis do .env
     
     DB_URL = os.getenv("DATABASE_URL")
@@ -143,17 +175,14 @@ def main():
 
     DUCKDB_FILE = 'analytics.duckdb'
     TABLE_NAME = 'sales_mart'
+    CHUNK_SIZE = 100000  # 100 mil linhas por vez. Pode ajustar se necessário.
 
-    # 1. Extract
-    df = extract_from_postgres(FLATTEN_SALES_QUERY, DB_URL)
-    
-    # 2. Load
-    if not df.empty:
-        load_to_duckdb(df, DUCKDB_FILE, TABLE_NAME)
-        print("\n--- Processo ETL concluído com sucesso! ---")
-        print(f"Arquivo '{DUCKDB_FILE}' criado/atualizado.")
-    else:
-        print("Processo ETL falhou ou não retornou dados.")
+    # Limpa o arquivo antigo, se existir, para começar do zero.
+    if os.path.exists(DUCKDB_FILE):
+        print(f"Removendo arquivo DuckDB antigo: {DUCKDB_FILE}")
+        os.remove(DUCKDB_FILE)
+
+    process_etl_in_chunks(DB_URL, DUCKDB_FILE, TABLE_NAME, CHUNK_SIZE)
 
 if __name__ == "__main__":
     main()
