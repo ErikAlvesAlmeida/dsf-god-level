@@ -1,4 +1,5 @@
 import duckdb
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -8,6 +9,19 @@ app = FastAPI(
     title="Analytics API para Restaurantes",
     description="API para consultar o Data Mart de vendas (sales_mart).",
     version="1.0.0"
+)
+
+origins = [
+    "http://localhost:5173", # A porta do frontend Vite
+    "http://127.0.0.1:5173"
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins, 
+    allow_credentials=True,
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
 class Filter(BaseModel):
