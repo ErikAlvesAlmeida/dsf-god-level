@@ -1,12 +1,11 @@
-import { ConfigProvider, Layout, Divider } from 'antd';
-import { QueryBuilder } from './components/QueryBuilder';
+import { ConfigProvider, Layout } from 'antd';
+import { DashboardMenu } from './components/DashboardMenu';
 import { DataDisplay } from './components/DataDisplay';
 
 const { Header, Content, Sider } = Layout;
 
 function App() {
   return (
-    // ConfigProvider aplica o tema do Ant Design
     <ConfigProvider>
       <Layout style={{ minHeight: '100vh' }}>
         <Header style={{ color: 'white' }}>
@@ -14,11 +13,11 @@ function App() {
         </Header>
         
         <Layout>
-          <Sider width={350} theme="light" style={{ padding: 24, borderRight: '1px solid #f0f0f0' }}>
-            <QueryBuilder />
+          <Sider width={300} theme="light" style={{ padding: 0 }}>
+            <DashboardMenu />
           </Sider>
 
-          <Content style={{ padding: 24, margin: 0 }}>
+          <Content style={{ padding: 24, margin: 0, backgroundColor: '#f0f2f5' }}>
             <DataDisplay />
           </Content>
         </Layout>

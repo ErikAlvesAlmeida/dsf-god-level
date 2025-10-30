@@ -131,6 +131,56 @@ async def get_delivery_by_neighborhood():
     """
     return run_query(query)
 
+@app.get("/api/v2/reports/sales_by_day_stacked")
+async def get_sales_by_day_stacked(mes_ano: str):
+    """
+    Sua feature: Gráfico clicável (Drill-down por mês).
+    Retorna o faturamento por dia, empilhado por canal, para um mês específico.
+    """
+    print(f"Buscando dados de drill-down para: {mes_ano}")
+    
+    query = f"""
+    SELECT
+        data_venda,
+        channel_name,
+        SUM(sale_total_amount) AS faturamento
+    FROM fct_sales
+    WHERE mes_ano = ?  -- Usamos '?' para segurança
+    GROUP BY data_venda, channel_name
+    ORDER BY data_venda, channel_name;
+    """
+    
+    # --- Lógica de Execução com Parâmetros ---
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        # Passa o 'mes_ano' como um parâmetro seguro
+        result = conn.execute(query, [mes_ano]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/delivery_by_neighborhood")
+async def get_delivery_by_neighborhood(order_by_asc: bool = False): # Default é Pior (DESC)
+    """
+    Sua pergunta: TEMPO MÉDIO POR BAIRRO
+    Adicionado parâmetro 'order_by_asc' para Piores (False) ou Melhores (True).
+    """
+    order_clause = "ASC" if order_by_asc else "DESC"
+    
+    query = f"""
+    SELECT
+        delivery_neighborhood,
+        AVG(delivery_seconds / 60) AS tempo_medio_min,
+        COUNT(sale_id) AS total_entregas
+    FROM fct_sales
+    WHERE channel_type = 'D' AND delivery_neighborhood IS NOT NULL
+    GROUP BY delivery_neighborhood
+    HAVING total_entregas > 5
+    ORDER BY tempo_medio_min {order_clause}
+    LIMIT 20;
+    """
+    return run_query(query)
 # --- FIM DOS ENDPOINTS ---
 
 @app.get("/")

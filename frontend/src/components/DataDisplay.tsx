@@ -1,10 +1,6 @@
-// src/components/DataDisplay.tsx
-
 import { Alert, Spin, Table, Typography, Tabs } from 'antd';
 import type { TabsProps } from 'antd';
-import { useQueryStore } from '../store/queryStore';
-
-// 1. Importe o ECharts
+import { useDashboardStore } from '../store/dashboardStore';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts/core';
 import { BarChart, PieChart } from 'echarts/charts';
@@ -17,7 +13,7 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
-// 2. Registre os componentes do ECharts
+// 2. Registra os componentes do ECharts
 echarts.use([
   TitleComponent,
   TooltipComponent,
@@ -30,28 +26,15 @@ echarts.use([
 ]);
 
 const { Title } = Typography;
-
-// --- MUDANÇA 1: Definindo um palette de cores melhor ---
 const COLOR_PALETTE = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#3BA272', '#FC8452'];
 
+function getChartOptions(
+  response: any,
+  onDrilldownClick: (mesAno: string) => void // O 'dispatcher' que o clique vai chamar
+) {
+  const { data, context } = response; // 'context' é o novo campo que vem do store
 
-// --- Função Helper para construir o gráfico ---
-function getChartOptions(response: any) {
-  const { data } = response;
-  
-  const dimensionKey = Object.keys(data[0]).find(k => !k.includes('faturamento') && !k.includes('total_vendas') && !k.includes('ticket_medio') && !k.includes('tempo_entrega_min'));
-  const metricKey = Object.keys(data[0]).find(k => k.includes('faturamento') || k.includes('total_vendas') || k.includes('ticket_medio') || k.includes('tempo_entrega_min'));
-
-  if (!dimensionKey || !metricKey) {
-    return null;
-  }
-  
-  // --- MUDANÇA 2: "Fatiar" os dados para exibir apenas o "Top 15" no gráfico ---
-  // A query já vem ordenada (LIMIT 100, ORDER BY ... DESC),
-  // então só precisamos pegar os 15 primeiros para o gráfico.
-  const chartData = data.slice(0, 15);
-  
-  // Helper para formatar os valores (ex: 12.3456 -> "R$ 12,35")
+  // Helper (função dentro de função)
   const formatValue = (value: any, key: string) => {
     if (typeof value !== 'number') return value;
     
@@ -61,22 +44,71 @@ function getChartOptions(response: any) {
     if (key.includes('tempo_entrega_min')) {
        return `${value.toFixed(2)} min`;
     }
-     // --- MUDANÇA 3: Formatação de decimais genérica ---
     if (!Number.isInteger(value)) {
       return value.toFixed(2);
     }
     return value;
   };
 
-
-  // --- Opção 1: Gráfico de Barras (agora com Top 15) ---
-  const barOption = {
-    // --- MUDANÇA 1 (Cores) ---
-    color: COLOR_PALETTE,
+  if (context === 'daily_stacked_histogram') {
+    // 1. Transformar os dados (Pivot)
+    const days = [...new Set(data.map((d: any) => d.data_venda))].sort();
+    const channels = [...new Set(data.map((d: any) => d.channel_name))];
     
+    const series = channels.map(channel => ({
+      name: channel,
+      type: 'bar',
+      stack: 'total', // Isso é o que "empilha" as barras
+      emphasis: { focus: 'series' },
+      data: days.map(day => {
+        const entry = data.find((d: any) => d.data_venda === day && d.channel_name === channel);
+        return entry ? entry.faturamento : 0;
+      })
+    }));
+
+    // 2. Retornar a opção do Histograma Empilhado
+    return {
+      color: COLOR_PALETTE,
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'shadow' },
+        formatter: (params: any[]) => {
+          let tooltip = `${params[0].axisValueLabel}<br/>`;
+          let dayTotal = 0;
+          params.forEach(param => {
+            const value = param.value || 0;
+            if (typeof value === 'number') {
+              dayTotal += value;
+              tooltip += `${param.marker} ${param.seriesName}: <strong>${formatValue(value, 'faturamento')}</strong><br/>`;
+            }
+          });
+          tooltip += `<strong>Total Dia: ${formatValue(dayTotal, 'faturamento')}</strong>`;
+          return tooltip;
+        }
+      },
+      legend: { data: channels, top: 30 }, // Joga a legenda para baixo do título
+      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
+      xAxis: { type: 'category', data: days },
+      yAxis: { type: 'value', axisLabel: { formatter: (val: number) => formatValue(val, 'faturamento') } },
+      series: series,
+    };
+  }
+
+  // --- Lógica Antiga (Gráficos Genéricos) ---
+  const dimensionKey = Object.keys(data[0]).find(k => !k.includes('faturamento') && !k.includes('total_vendas') && !k.includes('ticket_medio') && !k.includes('tempo_entrega_min'));
+  const metricKey = Object.keys(data[0]).find(k => k.includes('faturamento') || k.includes('total_vendas') || k.includes('ticket_medio') || k.includes('tempo_entrega_min'));
+
+  if (!dimensionKey || !metricKey) {
+    return null;
+  }
+  
+  const chartData = data.slice(0, 15);
+  
+  const barOption = {
+    color: COLOR_PALETTE,
     tooltip: { 
       trigger: 'axis',
-      // --- MUDANÇA 3 (Decimais no Tooltip) ---
       formatter: (params: any[]) => {
         const param = params[0];
         const dimension = param.axisValueLabel;
@@ -86,63 +118,54 @@ function getChartOptions(response: any) {
     },
     legend: { data: [metricKey] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    toolbox: {
-      feature: {
-        saveAsImage: { title: 'Salvar Imagem' }
-      }
-    },
+    toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
     xAxis: {
       type: 'category',
-      data: chartData.map((row: any) => row[dimensionKey]), // Usando chartData
+      data: chartData.map((row: any) => row[dimensionKey]),
     },
     yAxis: {
       type: 'value',
-      axisLabel: {
-        // --- MUDANÇA 3 (Decimais no Eixo Y) ---
-        formatter: (value: number) => formatValue(value, metricKey)
-      }
+      axisLabel: { formatter: (value: number) => formatValue(value, metricKey) }
     },
     series: [
       {
         name: metricKey,
         type: 'bar',
-        data: chartData.map((row: any) => row[metricKey]), // Usando chartData
+        data: chartData.map((row: any) => row[metricKey]),
         colorBy: 'data'
       },
     ],
-    dataZoom: [ 
-      { type: 'inside', start: 0, end: 100 }, // O zoom agora é mais útil
-      { type: 'slider', start: 0, end: 100 }
-    ]
+    dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', start: 0, end: 100 } ],
+
+    onEvents: {
+      'click': (params: any) => {
+        // 'params.name' é o valor do eixo X (ex: "2025-05")
+        if (dimensionKey === 'mes_ano') { 
+          console.log('CLICOU NO MÊS:', params.name);
+          onDrilldownClick(params.name); // Chama o dispatcher do store!
+        }
+      }
+    }
   };
 
-  // --- Opção 2: Gráfico de Pizza ---
   const pieOption = {
-    color: COLOR_PALETTE, // --- MUDANÇA 1 (Cores) ---
-    title: {
-      text: `Distribuição por ${dimensionKey}`,
-      left: 'center'
-    },
+    color: COLOR_PALETTE,
+    title: { text: `Distribuição por ${dimensionKey}`, left: 'center' },
     tooltip: { 
       trigger: 'item',
-      // --- MUDANÇA 3 (Decimais no Tooltip) ---
       formatter: (param: any) => {
         const { name, value, percent } = param;
         return `${name}<br /><strong>${formatValue(value, metricKey)}</strong> (${percent}%)`;
       }
     },
     legend: { orient: 'vertical', left: 'left' },
-    toolbox: {
-      feature: {
-        saveAsImage: { title: 'Salvar Imagem' }
-      }
-    },
+    toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
     series: [
       {
         name: metricKey,
         type: 'pie',
         radius: '50%',
-        data: chartData.map((row: any) => ({ // Usando chartData
+        data: chartData.map((row: any) => ({
           value: row[metricKey],
           name: row[dimensionKey],
         })),
@@ -154,7 +177,16 @@ function getChartOptions(response: any) {
           }
         }
       }
-    ]
+    ],
+
+    onEvents: {
+      'click': (params: any) => {
+        if (dimensionKey === 'mes_ano') {
+          console.log('CLICOU NO MÊS:', params.name);
+          onDrilldownClick(params.name);
+        }
+      }
+    }
   };
   
   if (data.length <= 7) {
@@ -162,28 +194,30 @@ function getChartOptions(response: any) {
   }
   return barOption;
 }
-// --- Fim da Função Helper ---
 
 
 export function DataDisplay() {
-  const { response, isLoading, error } = useQueryStore();
+  const { reportData, isLoading, error, fetchDrilldownReport } = useDashboardStore();
 
   if (isLoading) {
-    return <Spin tip="Carregando dados..." size="large" style={{ display: 'block', marginTop: 50 }} />;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>
+        <Spin tip="Carregando dados..." size="large" />
+      </div>
+    );
   }
   if (error) {
-    return <Alert message="Erro ao consultar API" description={error} type="error" showIcon />;
+    return <Alert message="Erro ao carregar relatório" description={error} type="error" showIcon />;
   }
-  if (!response || response.data.length === 0) {
-    return <Alert message="Nenhum dado para exibir" description="Rode uma consulta para ver os resultados aqui." type="info" />;
+  
+  if (!reportData || reportData.data.length === 0) {
+    return <Alert message="Nenhum dado para exibir" description="Selecione um relatório no menu ao lado." type="info" />;
   }
 
-  // --- MUDANÇA 3 (Decimais na Tabela) ---
-  const columns = Object.keys(response.data[0]).map((key) => ({
+  const columns = Object.keys(reportData.data[0]).map((key) => ({
     title: key.replace(/_/g, ' ').toUpperCase(),
     dataIndex: key,
     key: key,
-    // Sorter para a tabela
     sorter: (a: any, b: any) => {
         if (typeof a[key] === 'number' && typeof b[key] === 'number') {
             return a[key] - b[key];
@@ -198,7 +232,6 @@ export function DataDisplay() {
         if (key.includes('faturamento') || key.includes('ticket_medio')) {
           return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
-        // Força 2 casas decimais em QUALQUER float
         if (!Number.isInteger(value)) {
           return value.toFixed(2);
         }
@@ -207,12 +240,12 @@ export function DataDisplay() {
     },
   }));
   
-  const chartOption = getChartOptions(response);
+  const chartOption = getChartOptions(reportData, fetchDrilldownReport); // Passa o novo objeto
 
   const tabItems: TabsProps['items'] = [
     {
       key: '1',
-      label: 'Gráfico (Top 15)', // --- MUDANÇA 2 (Label) ---
+      label: 'Gráfico',
       disabled: !chartOption, 
       children: chartOption ? (
         <ReactECharts
@@ -220,16 +253,17 @@ export function DataDisplay() {
           option={chartOption}
           style={{ height: '400px', width: '100%' }}
           notMerge={true}
+          onEvents={(chartOption as any)?.onEvents}
         />
       ) : <Alert type="info" message="Não foi possível gerar um gráfico para esta combinação de dados." />,
     },
     {
       key: '2',
-      label: 'Tabela de Dados (Completa)', // --- MUDANÇA 2 (Label) ---
+      label: 'Tabela de Dados (Completa)',
       children: (
         <Table
           columns={columns}
-          dataSource={response.data} // A tabela continua com TODOS os dados
+          dataSource={reportData.data}
           rowKey={(_, index) => `row-${index}`}
           bordered
           size="small"
@@ -241,17 +275,11 @@ export function DataDisplay() {
   ];
 
   return (
-    <div>
-      <Title level={4}>Resultados</Title>
+    <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
+      <Title level={3} style={{ marginTop: 0 }}>{reportData.title}</Title>
       
       <Tabs defaultActiveKey="1" items={tabItems} />
       
-      <Alert
-        type="info"
-        message="Query SQL Executada"
-        description={<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{response.query_sql}</pre>}
-        style={{ marginTop: 16 }}
-      />
     </div>
   );
 }
