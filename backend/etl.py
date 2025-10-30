@@ -4,16 +4,25 @@ import pandas as pd
 import psycopg2
 from dotenv import load_dotenv
 
-# --- QUERY 1: FCT_SALES (Grão: Venda) ---
-# Usada para KPIs de alto nível: Faturamento, Descontos, Pagamentos, Clientes, Entrega
+# --- QUERY 1 OTIMIZADA: FCT_SALES (Grão: Venda) ---
 FCT_SALES_QUERY = """
-WITH sales_base AS (
+WITH 
+-- Otimização 1: Pré-agregar os pagamentos UMA VEZ
+payment_agg AS (
+    SELECT DISTINCT ON (p.sale_id) -- Pega apenas o primeiro pagamento por venda
+        p.sale_id,
+        pt.description AS payment_type
+    FROM payments p
+    JOIN payment_types pt ON p.payment_type_id = pt.id
+    ORDER BY p.sale_id, p.id -- Garante que estamos pegando o "primeiro" consistentemente
+),
+sales_base AS (
     SELECT
         s.id AS sale_id,
         s.created_at AS sale_created_at,
         
-        -- === NOVAS COLUNAS DE DATA ===
-        EXTRACT(DOW FROM s.created_at) AS dia_da_semana, -- (0=Dom, ... 6=Sab)
+        -- Colunas de Data (Enriquecimento)
+        EXTRACT(DOW FROM s.created_at) AS dia_da_semana,
         CASE 
             WHEN EXTRACT(DOW FROM s.created_at) = 0 THEN 'Domingo'
             WHEN EXTRACT(DOW FROM s.created_at) = 1 THEN 'Segunda'
@@ -32,8 +41,8 @@ WITH sales_base AS (
             WHEN EXTRACT(HOUR FROM s.created_at) BETWEEN 12 AND 17 THEN 'Almoço'
             WHEN EXTRACT(HOUR FROM s.created_at) BETWEEN 18 AND 23 THEN 'Jantar'
         END AS periodo_do_dia,
-        -- === FIM DAS NOVAS COLUNAS ===
 
+        -- Métricas de Venda
         s.sale_status_desc,
         s.total_amount AS sale_total_amount,
         s.total_discount,
@@ -47,33 +56,42 @@ WITH sales_base AS (
         st.name AS store_name,
         st.city AS store_city,
         ch.name AS channel_name,
-        ch.type AS channel_type, -- 'P' Presencial, 'D' Delivery
+        ch.type AS channel_type,
         s.customer_id,
         da.neighborhood AS delivery_neighborhood,
         da.city AS delivery_city,
         
-        -- Dimensão de Pagamento (ainda com a limitação de 1)
-        (SELECT pt.description 
-         FROM payments p 
-         JOIN payment_types pt ON p.payment_type_id = pt.id 
-         WHERE p.sale_id = s.id 
-         LIMIT 1) AS payment_type
+        -- Otimização 1 (Resultado): Um JOIN simples em vez de uma sub-query
+        p.payment_type
     FROM
         sales s
     JOIN stores st ON s.store_id = st.id
     JOIN channels ch ON s.channel_id = ch.id
     LEFT JOIN delivery_addresses da ON s.id = da.sale_id
+    -- Otimização 1 (Join):
+    LEFT JOIN payment_agg p ON s.id = p.sale_id
     WHERE
         s.sale_status_desc = 'COMPLETED'
-    -- APLICA A AMOSTRAGEM (PLANO C)
 )
 SELECT * FROM sales_base;
 """
 
-# --- QUERY 2: FCT_PRODUCT_SALES (Grão: Produto Vendido) ---
-# Usada para análises de Mix de Produto, Categorias, etc.
+# --- QUERY 2 OTIMIZADA: FCT_PRODUCT_SALES (Grão: Produto) ---
 FCT_PRODUCT_SALES_QUERY = """
-WITH products_base AS (
+WITH 
+-- Otimização 2: Pré-agregar os items (customizações) UMA VEZ
+items_agg AS (
+    SELECT
+        ips.product_sale_id,
+        STRING_AGG(i.name, ', ') AS items_names,
+        SUM(ips.additional_price) AS items_total_additional_price
+    FROM
+        item_product_sales ips
+    JOIN items i ON ips.item_id = i.id
+    GROUP BY
+        ips.product_sale_id
+),
+products_base AS (
     SELECT
         ps.sale_id,
         p.id AS product_id,
@@ -83,19 +101,16 @@ WITH products_base AS (
         ps.base_price AS product_base_price,
         ps.total_price AS product_total_price,
         
-        -- Agregando customizações (items)
-        STRING_AGG(i.name, ', ') AS items_names,
-        SUM(ips.additional_price) AS items_total_additional_price
+        -- Otimização 2 (Resultado): Apenas pega os valores pré-agregados
+        ia.items_names,
+        ia.items_total_additional_price
     FROM
         product_sales ps
     JOIN products p ON ps.product_id = p.id
     LEFT JOIN categories cat ON p.category_id = cat.id
-    LEFT JOIN item_product_sales ips ON ps.id = ips.product_sale_id
-    LEFT JOIN items i ON ips.item_id = i.id
-    GROUP BY
-        ps.sale_id, p.id, p.name, cat.name, ps.quantity, ps.base_price, ps.total_price
+    -- Otimização 2 (Join):
+    LEFT JOIN items_agg ia ON ps.id = ia.product_sale_id
 ),
--- Traz as dimensões da venda (data, loja, canal) para o nível do produto
 sales_dims AS (
     SELECT
         s.id AS sale_id,
@@ -113,7 +128,6 @@ sales_dims AS (
     LEFT JOIN delivery_addresses da ON s.id = da.sale_id
     WHERE
         s.sale_status_desc = 'COMPLETED'
-    -- APLICA A MESMA AMOSTRAGEM (PLANO C)
 )
 SELECT
     sd.*,
@@ -133,6 +147,7 @@ JOIN
 
 def process_etl_in_chunks(db_url: str, duckdb_file: str, query: str, table_name: str, chunk_size: int = 100000):
     """
+    (Esta função está 100% CORRETA e NÃO MUDA)
     Executa o ETL processando os dados em "chunks" (pedaços)
     para evitar o esgotamento de memória RAM.
     """
@@ -194,7 +209,7 @@ def process_etl_in_chunks(db_url: str, duckdb_file: str, query: str, table_name:
             conn_duckdb.close()
 
 def main():
-    """Função principal do pipeline ETL."""
+    """(Esta função está 100% CORRETA e NÃO MUDA)"""
     load_dotenv() 
     
     DB_URL = os.getenv("DATABASE_URL")
@@ -215,7 +230,7 @@ def main():
     # 2. Tabela de Produtos Vendidos (Grão: Produto)
     process_etl_in_chunks(DB_URL, DUCKDB_FILE, FCT_PRODUCT_SALES_QUERY, table_name='fct_product_sales')
     
-    print("\n--- Processo ETL v3 Concluído ---")
+    print("\n--- Processo ETL v4 (Otimizado) Concluído ---")
     print(f"Arquivo '{DUCKDB_FILE}' atualizado com 2 tabelas.")
     print("Conexão com PostgreSQL fechada.")
     print("Conexão com DuckDB fechada.")
