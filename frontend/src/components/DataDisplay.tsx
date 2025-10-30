@@ -96,8 +96,8 @@ function getChartOptions(
   }
 
   // --- Lógica Antiga (Gráficos Genéricos) ---
-  const dimensionKey = Object.keys(data[0]).find(k => !k.includes('faturamento') && !k.includes('total_vendas') && !k.includes('ticket_medio') && !k.includes('tempo_entrega_min'));
-  const metricKey = Object.keys(data[0]).find(k => k.includes('faturamento') || k.includes('total_vendas') || k.includes('ticket_medio') || k.includes('tempo_entrega_min'));
+  const dimensionKey = Object.keys(data[0]).find(k => !k.includes('faturamento') && !k.includes('total_vendas') && !k.includes('ticket_medio') && !k.includes('tempo_medio_min') && !k.includes('total_entregas'));
+  const metricKey = Object.keys(data[0]).find(k => k.includes('faturamento') || k.includes('total_vendas') || k.includes('ticket_medio') || k.includes('tempo_medio_min'));
 
   if (!dimensionKey || !metricKey) {
     return null;

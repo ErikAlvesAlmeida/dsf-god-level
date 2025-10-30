@@ -114,23 +114,6 @@ async def get_sales_by_payment_type():
     """
     return run_query(query)
 
-@app.get("/api/v2/reports/delivery_by_neighborhood")
-async def get_delivery_by_neighborhood():
-    """Sua pergunta: TEMPO MÉDIO POR BAIRRO"""
-    query = """
-    SELECT
-        delivery_neighborhood,
-        AVG(delivery_seconds / 60) AS tempo_medio_min,
-        COUNT(sale_id) AS total_entregas
-    FROM fct_sales
-    WHERE channel_type = 'D' AND delivery_neighborhood IS NOT NULL
-    GROUP BY delivery_neighborhood
-    HAVING total_entregas > 5 -- Remove bairros com pouquíssimas entregas
-    ORDER BY tempo_medio_min DESC
-    LIMIT 20;
-    """
-    return run_query(query)
-
 @app.get("/api/v2/reports/sales_by_day_stacked")
 async def get_sales_by_day_stacked(mes_ano: str):
     """
@@ -161,7 +144,7 @@ async def get_sales_by_day_stacked(mes_ano: str):
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
 
 @app.get("/api/v2/reports/delivery_by_neighborhood")
-async def get_delivery_by_neighborhood(order_by_asc: bool = False): # Default é Pior (DESC)
+async def get_delivery_by_neighborhood(order_by_asc: bool = False):
     """
     Sua pergunta: TEMPO MÉDIO POR BAIRRO
     Adicionado parâmetro 'order_by_asc' para Piores (False) ou Melhores (True).

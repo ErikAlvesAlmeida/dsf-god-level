@@ -3,6 +3,13 @@ import { create } from 'zustand';
 // Re-usamos o tipo de dados, pois a API ainda retorna linhas de dados
 type DataRow = Record<string, any>;
 
+export interface KpiData {
+  faturamento_total: number;
+  ticket_medio: number;
+  total_vendas: number;
+  avg_tempo_entrega_min: number;
+}
+
 export interface ReportData {
   title: string;
   data: DataRow[];
@@ -11,8 +18,10 @@ export interface ReportData {
 }
 
 interface DashboardState {
+  kpiData: KpiData | null;
   reportData: ReportData | null;
   isLoading: boolean;
+  isLoadingKpis: boolean;
   error: string | null;
   
   fetchReport: (endpoint: string, title: string, params?: Record<string, any>) => Promise<void>;
@@ -23,16 +32,56 @@ const API_BASE_URL = 'http://localhost:8000/api/v2';
 
 export const useDashboardStore = create<DashboardState>((set) => ({
   // --- Valores Iniciais ---
+  kpiData: null,
   reportData: null,
   isLoading: false,
+  isLoadingKpis: false,
   error: null,
 
+  fetchKpis: async () => {
+    set({ isLoadingKpis: true });
+    try {
+      const res = await fetch(`${API_BASE_URL}/reports/kpi_summary`);
+      if (!res.ok) throw new Error('Erro ao buscar KPIs');
+      const data: DataRow[] = await res.json();
+      
+      if (data.length > 0) {
+        set({ kpiData: data[0] as KpiData, isLoadingKpis: false });
+      } else {
+        throw new Error('KPIs retornaram vazios');
+      }
+    } catch (err: any) {
+      set({ error: err.message, isLoadingKpis: false });
+    }
+  },
   // --- Ação Principal (Chamar um endpoint) ---
-  fetchReport: async (endpoint: string, title: string) => {
+  fetchReport: async (endpoint: string, title: string, params?: Record<string, any>) => {
     set({ isLoading: true, error: null, reportData: null });
     
     try {
-      const res = await fetch(`${API_BASE_URL}${endpoint}`); // Ex: /api/v2/reports/sales_by_store
+      let url = `${API_BASE_URL}${endpoint}`;
+      
+      if (params) {
+        // --- CORREÇÃO DO BOOLEANO ---
+        // Constrói a query string manualmente
+        const queryParts: string[] = [];
+        for (const key in params) {
+          if (Object.prototype.hasOwnProperty.call(params, key)) {
+            // Converte o valor (incluindo 'false') para string explicitamente
+            const value = String(params[key]); 
+            queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+          }
+        }
+
+        if (queryParts.length > 0) {
+          url += `?${queryParts.join('&')}`;
+        }
+        // --- FIM DA CORREÇÃO ---
+      }
+
+      console.log("Chamando API:", url); // Adiciona um log para debug
+
+      const res = await fetch(url);
 
       if (!res.ok) {
         const errText = await res.text();
@@ -42,7 +91,11 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       const data: DataRow[] = await res.json();
       
       set({ 
-        reportData: { data, title },
+        reportData: { 
+          data, 
+          title,
+          context: endpoint.split('/').pop() 
+        },
         isLoading: false 
       });
       
@@ -50,6 +103,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
       set({ error: err.message, isLoading: false });
     }
   },
+
   fetchDrilldownReport: async (mesAno: string) => {
     set({ isLoading: true, error: null });
     const title = `Faturamento Diário Empilhado (${mesAno})`;
