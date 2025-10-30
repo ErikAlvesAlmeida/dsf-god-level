@@ -1,146 +1,138 @@
 import duckdb
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, HTTPException, Body
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any
 
 # --- Configuração da API ---
 app = FastAPI(
-    title="Analytics API para Restaurantes",
-    description="API para consultar o Data Mart de vendas (sales_mart).",
-    version="1.0.0"
+    title="Analytics API v2 (Curada)",
+    description="API com endpoints pré-definidos para o dashboard.",
+    version="2.0.0"
 )
 
-origins = [
-    "http://localhost:5173", # A porta do frontend Vite
-    "http://127.0.0.1:5173"
-]
-
+origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, 
+    allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],  
-    allow_headers=["*"],  
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-class Filter(BaseModel):
-    """Define um filtro a ser aplicado na query."""
-    field: str = Field(..., description="Coluna a ser filtrada. Ex: 'channel_name'")
-    operator: str = Field(..., description="Operador. Ex: 'eq', 'in', 'gte', 'like'")
-    value: Any = Field(..., description="Valor do filtro. Ex: 'iFood' ou [1, 2, 3]")
-
-class QueryRequest(BaseModel):
-    """Define a estrutura de uma requisição de consulta analítica."""
-    metrics: List[str] = Field(..., description="Métricas a serem calculadas. Ex: ['SUM(sale_total_amount)', 'COUNT(DISTINCT sale_id)']")
-    dimensions: List[str] = Field(..., description="Dimensões para agrupar (GROUP BY). Ex: ['store_name', 'channel_name']")
-    filters: List[Filter] = Field([], description="Lista de filtros (WHERE).")
-    order_by: Dict[str, str] = Field({}, description="Ordenação (ORDER BY). Ex: {'SUM_sale_total_amount': 'desc'}")
-    limit: int = Field(100, description="Limite de linhas (LIMIT).")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "metrics": ["COUNT(DISTINCT sale_id) as total_vendas", "SUM(sale_total_amount) as faturamento"],
-                "dimensions": ["store_name"],
-                "filters": [
-                    {"field": "channel_name", "operator": "eq", "value": "iFood"},
-                    {"field": "sale_created_at", "operator": "gte", "value": "2025-10-01T00:00:00"}
-                ],
-                "order_by": {"faturamento": "desc"},
-                "limit": 10
-            }
-        }
-
-# --- Conexão com o Banco de Dados (DuckDB) ---
+# --- Conexão com o DuckDB ---
 DUCKDB_FILE = 'analytics.duckdb'
-TABLE_NAME = 'sales_mart'
 
-def get_duckdb_conn():
-    """Retorna uma conexão read-only com o DuckDB."""
+def run_query(query: str):
+    """Helper para rodar uma query no DuckDB e retornar como JSON."""
     try:
-        # read_only=True garante que a API não modifique os dados
-        return duckdb.connect(database=DUCKDB_FILE, read_only=True)
-    except Exception as e:
-        # Isso vai falhar se o arquivo ainda não existir.
-        print(f"Erro ao conectar ao DuckDB (o arquivo pode não existir ainda): {e}")
-        raise HTTPException(status_code=503, detail="Data Mart indisponível. O ETL pode estar rodando.")
-
-def build_sql(query: QueryRequest) -> str:
-    
-    metrics_str = ", ".join(query.metrics)
-    dimensions_str = ", ".join(query.dimensions)
-    
-    sql = f"SELECT {metrics_str}, {dimensions_str} FROM {TABLE_NAME}"
-    
-    # 1. Cláusula WHERE (Filtros)
-    where_clauses = []
-    params = [] # Para "safe query execution" (evitar injection)
-    
-    if query.filters:
-        for f in query.filters:
-            # TODO: Adicionar mais operadores seguros (in, gte, lte, like)
-            if f.operator.lower() == 'eq':
-                where_clauses.append(f"{f.field} = ?")
-                params.append(f.value)
-            elif f.operator.lower() == 'gte':
-                where_clauses.append(f"{f.field} >= ?")
-                params.append(f.value)
-            # Adicionar mais operadores aqui...
-            
-        if where_clauses:
-            sql += " WHERE " + " AND ".join(where_clauses)
-            
-    # 2. Cláusula GROUP BY (Dimensões)
-    if query.dimensions:
-        sql += f" GROUP BY {dimensions_str}"
-        
-    # 3. Cláusula ORDER BY
-    if query.order_by:
-        order_parts = [f"{col} {direction.upper()}" for col, direction in query.order_by.items()]
-        sql += " ORDER BY " + ", ".join(order_parts)
-        
-    # 4. Cláusula LIMIT
-    sql += f" LIMIT {query.limit}"
-    
-    return sql, params
-
-
-# --- O Endpoint da API ---
-
-@app.post("/api/v1/query")
-def execute_analytics_query(request: QueryRequest = Body(..., example=QueryRequest.Config.schema_extra["example"])):
-    
-    sql_query, params = build_sql(request)
-    print(f"Executando SQL: {sql_query}")
-    print(f"Com parâmetros: {params}")
-    
-    try:
-        conn = get_duckdb_conn()
-    except HTTPException as e:
-        return e # Retorna 503 se o DB não estiver pronto
-
-    try:
-        # .df() retorna o resultado como um DataFrame Pandas,
-        # que o FastAPI converte automaticamente para JSON.
-        result_df = conn.execute(sql_query, params).df()
-        
-        # Converte para JSON no formato que o frontend espera
-        result_json = result_df.to_dict(orient='records')
-        
-        return {
-            "query_sql": sql_query,
-            "params": params,
-            "count": len(result_json),
-            "data": result_json
-        }
-    except Exception as e:
-        print(f"Erro ao executar query no DuckDB: {e}")
-        # Retorna o erro SQL para o frontend (bom para debug)
-        raise HTTPException(status_code=400, detail=f"Erro na query: {str(e)}")
-    finally:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        result = conn.execute(query).df().to_dict(orient='records')
         conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+# --- Endpoints de Relatórios (Mapeados para o seu Roadmap) ---
+
+@app.get("/api/v2/reports/kpi_summary")
+async def get_kpi_summary():
+    """Retorna os KPIs principais (Cards)."""
+    query = """
+    SELECT
+        SUM(sale_total_amount) AS faturamento_total,
+        AVG(sale_total_amount) AS ticket_medio,
+        COUNT(sale_id) AS total_vendas,
+        AVG(delivery_seconds / 60) AS avg_tempo_entrega_min
+    FROM fct_sales;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/sales_by_store")
+async def get_sales_by_store():
+    """Sua pergunta: QUAL LOJA VENDEU MAIS/MENOS"""
+    query = """
+    SELECT
+        store_name,
+        SUM(sale_total_amount) AS faturamento,
+        COUNT(sale_id) AS total_vendas
+    FROM fct_sales
+    GROUP BY store_name
+    ORDER BY faturamento DESC;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/sales_by_channel")
+async def get_sales_by_channel():
+    """Sua pergunta: QUAL CANAL VENDEU MAIS/MENOS"""
+    query = """
+    SELECT
+        channel_name,
+        SUM(sale_total_amount) AS faturamento,
+        COUNT(sale_id) AS total_vendas
+    FROM fct_sales
+    GROUP BY channel_name
+    ORDER BY faturamento DESC;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/sales_by_month")
+async def get_sales_by_month():
+    """Sua pergunta: QUAL MÊS EU VENDI MAIS/MENOS"""
+    query = """
+    SELECT
+        mes_ano,
+        SUM(sale_total_amount) AS faturamento
+    FROM fct_sales
+    GROUP BY mes_ano
+    ORDER BY mes_ano;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/top_products_by_revenue")
+async def get_top_products_by_revenue():
+    """Sua pergunta: QUAL PRODUTO MAIS VENDEU"""
+    query = """
+    SELECT
+        product_name,
+        SUM(product_total_price) AS faturamento
+    FROM fct_product_sales
+    GROUP BY product_name
+    ORDER BY faturamento DESC
+    LIMIT 20;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/sales_by_payment_type")
+async def get_sales_by_payment_type():
+    """Sua pergunta: QUANTO EU VENDI EM..."""
+    query = """
+    SELECT
+        COALESCE(payment_type, 'Não Identificado') AS forma_pagamento,
+        SUM(sale_total_amount) AS faturamento
+    FROM fct_sales
+    GROUP BY forma_pagamento
+    ORDER BY faturamento DESC;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/delivery_by_neighborhood")
+async def get_delivery_by_neighborhood():
+    """Sua pergunta: TEMPO MÉDIO POR BAIRRO"""
+    query = """
+    SELECT
+        delivery_neighborhood,
+        AVG(delivery_seconds / 60) AS tempo_medio_min,
+        COUNT(sale_id) AS total_entregas
+    FROM fct_sales
+    WHERE channel_type = 'D' AND delivery_neighborhood IS NOT NULL
+    GROUP BY delivery_neighborhood
+    HAVING total_entregas > 5 -- Remove bairros com pouquíssimas entregas
+    ORDER BY tempo_medio_min DESC
+    LIMIT 20;
+    """
+    return run_query(query)
+
+# --- FIM DOS ENDPOINTS ---
 
 @app.get("/")
-def read_root():
+async def read_root():
     return {"status": "Analytics API está no ar!"}
