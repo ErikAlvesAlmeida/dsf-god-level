@@ -1,6 +1,7 @@
 import duckdb
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 
 # --- Configuração da API ---
 app = FastAPI(
@@ -48,7 +49,7 @@ async def get_kpi_summary():
 
 @app.get("/api/v2/reports/sales_by_store")
 async def get_sales_by_store():
-    """Sua pergunta: QUAL LOJA VENDEU MAIS/MENOS"""
+    """QUAL LOJA VENDEU MAIS/MENOS"""
     query = """
     SELECT
         store_name,
@@ -62,7 +63,7 @@ async def get_sales_by_store():
 
 @app.get("/api/v2/reports/sales_by_channel")
 async def get_sales_by_channel():
-    """Sua pergunta: QUAL CANAL VENDEU MAIS/MENOS"""
+    """QUAL CANAL VENDEU MAIS/MENOS"""
     query = """
     SELECT
         channel_name,
@@ -76,7 +77,7 @@ async def get_sales_by_channel():
 
 @app.get("/api/v2/reports/sales_by_month")
 async def get_sales_by_month():
-    """Sua pergunta: QUAL MÊS EU VENDI MAIS/MENOS"""
+    """QUAL MÊS EU VENDI MAIS/MENOS"""
     query = """
     SELECT
         mes_ano,
@@ -89,7 +90,7 @@ async def get_sales_by_month():
 
 @app.get("/api/v2/reports/top_products_by_revenue")
 async def get_top_products_by_revenue():
-    """Sua pergunta: QUAL PRODUTO MAIS VENDEU"""
+    """QUAL PRODUTO MAIS VENDEU"""
     query = """
     SELECT
         product_name,
@@ -103,7 +104,7 @@ async def get_top_products_by_revenue():
 
 @app.get("/api/v2/reports/sales_by_payment_type")
 async def get_sales_by_payment_type():
-    """Sua pergunta: QUANTO EU VENDI EM..."""
+    """QUANTO EU VENDI EM..."""
     query = """
     SELECT
         COALESCE(payment_type, 'Não Identificado') AS forma_pagamento,
@@ -115,12 +116,16 @@ async def get_sales_by_payment_type():
     return run_query(query)
 
 @app.get("/api/v2/reports/sales_by_day_stacked")
-async def get_sales_by_day_stacked(mes_ano: str):
+async def get_sales_by_day_stacked(mes_ano: str, store_name: Optional[str] = None):
     """
-    Sua feature: Gráfico clicável (Drill-down por mês).
-    Retorna o faturamento por dia, empilhado por canal, para um mês específico.
+    Feature: Gráfico clicável (Drill-down por mês).
+    Retorna o faturamento por dia, empilhado por canal.
+    AGORA TAMBÉM FILTRA POR LOJA, se 'store_name' for fornecido.
     """
-    print(f"Buscando dados de drill-down para: {mes_ano}")
+    print(f"Buscando dados de drill-down para: {mes_ano}, Loja: {store_name}")
+    
+    # Lista de parâmetros para a query segura
+    params = [mes_ano]
     
     query = f"""
     SELECT
@@ -128,7 +133,15 @@ async def get_sales_by_day_stacked(mes_ano: str):
         channel_name,
         SUM(sale_total_amount) AS faturamento
     FROM fct_sales
-    WHERE mes_ano = ?  -- Usamos '?' para segurança
+    WHERE mes_ano = ? 
+    """
+
+    # Adiciona o filtro de loja SÓ SE ele for passado
+    if store_name:
+        query += " AND store_name = ? "
+        params.append(store_name)
+        
+    query += """
     GROUP BY data_venda, channel_name
     ORDER BY data_venda, channel_name;
     """
@@ -136,8 +149,8 @@ async def get_sales_by_day_stacked(mes_ano: str):
     # --- Lógica de Execução com Parâmetros ---
     try:
         conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
-        # Passa o 'mes_ano' como um parâmetro seguro
-        result = conn.execute(query, [mes_ano]).df().to_dict(orient='records')
+        # Passa a lista de parâmetros (1 ou 2)
+        result = conn.execute(query, params).df().to_dict(orient='records')
         conn.close()
         return result
     except Exception as e:
@@ -146,7 +159,7 @@ async def get_sales_by_day_stacked(mes_ano: str):
 @app.get("/api/v2/reports/delivery_by_neighborhood")
 async def get_delivery_by_neighborhood(order_by_asc: bool = False):
     """
-    Sua pergunta: TEMPO MÉDIO POR BAIRRO
+    TEMPO MÉDIO POR BAIRRO
     Adicionado parâmetro 'order_by_asc' para Piores (False) ou Melhores (True).
     """
     order_clause = "ASC" if order_by_asc else "DESC"
@@ -164,6 +177,33 @@ async def get_delivery_by_neighborhood(order_by_asc: bool = False):
     LIMIT 20;
     """
     return run_query(query)
+
+@app.get("/api/v2/reports/sales_by_month_for_store")
+async def get_sales_by_month_for_store(store_name: str):
+    """
+    Feature: Drill-down por Loja.
+    Retorna o faturamento por mês para uma loja específica.
+    """
+    print(f"Buscando dados de drill-down para a loja: {store_name}")
+    
+    query = f"""
+    SELECT
+        mes_ano,
+        SUM(sale_total_amount) AS faturamento
+    FROM fct_sales
+    WHERE store_name = ?  -- Filtra pela loja
+    GROUP BY mes_ano
+    ORDER BY mes_ano;
+    """
+    
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        # Passa o 'store_name' como um parâmetro seguro
+        result = conn.execute(query, [store_name]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
 # --- FIM DOS ENDPOINTS ---
 
 @app.get("/")

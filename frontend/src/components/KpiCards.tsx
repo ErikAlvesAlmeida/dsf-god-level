@@ -1,24 +1,27 @@
+// src/components/KpiCards.tsx
 import { Card, Col, Row, Statistic, Skeleton } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'; // (Apenas visual, sem lógica ainda)
+import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import { useEffect } from 'react';
 import { useDashboardStore } from '../store/dashboardStore';
 
-// Helper para formatar R$
 const formatCurrency = (value: number) => 
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-// Helper para formatar números (ex: 12345 -> 12.3k)
 const formatNumber = (value: number) =>
   new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-
-// Helper para formatar minutos
 const formatMinutes = (value: number) =>
   `${value.toFixed(2)} min`;
 
-export function KpiCards() {
-  const { kpiData, isLoadingKpis } = useDashboardStore();
 
-  // Se estiver carregando, mostra "esqueletos"
-  if (isLoadingKpis || !kpiData) {
+export function KpiCards() {
+  const { kpiData, isLoadingKpis, error, fetchKpis } = useDashboardStore();
+
+  useEffect(() => {
+    // Busca os KPIs UMA VEZ quando o *componente* carregar
+    fetchKpis();
+  }, [fetchKpis]);
+
+  // 1. Estado de Carregamento
+  if (isLoadingKpis) {
     return (
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} md={6}><Skeleton active paragraph={{ rows: 2 }} /></Col>
@@ -29,7 +32,14 @@ export function KpiCards() {
     );
   }
 
-  // Se carregou, mostra os cards
+  // 2. Estado de Erro ou Vazio (Após o loading)
+  if (error || !kpiData) {
+    // Não renderiza nada se os KPIs falharam, para não poluir a UI.
+    // O erro será mostrado no console (ou poderíamos adicionar um <Alert> aqui)
+    return null;
+  }
+  
+  // 3. Estado de Sucesso
   return (
     <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
       <Col xs={24} sm={12} md={6}>
@@ -39,7 +49,6 @@ export function KpiCards() {
             value={formatCurrency(kpiData.faturamento_total)}
             precision={2}
             valueStyle={{ color: '#3f8600' }}
-            // prefix={<ArrowUpOutlined />} // (Feature futura)
           />
         </Card>
       </Col>
@@ -70,7 +79,6 @@ export function KpiCards() {
             value={formatMinutes(kpiData.avg_tempo_entrega_min)}
             precision={2}
             valueStyle={{ color: '#cf1322' }} // Vermelho, pois tempo alto é ruim
-            // prefix={<ArrowDownOutlined />} // (Feature futura: seta p/ baixo é bom)
           />
         </Card>
       </Col>

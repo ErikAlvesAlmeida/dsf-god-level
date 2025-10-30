@@ -1,6 +1,6 @@
 import { Alert, Spin, Table, Typography, Tabs } from 'antd';
 import type { TabsProps } from 'antd';
-import { useDashboardStore } from '../store/dashboardStore';
+import { useDashboardStore, type ReportData } from '../store/dashboardStore';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts/core';
 import { BarChart, PieChart } from 'echarts/charts';
@@ -29,10 +29,10 @@ const { Title } = Typography;
 const COLOR_PALETTE = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#3BA272', '#FC8452'];
 
 function getChartOptions(
-  response: any,
-  onDrilldownClick: (mesAno: string) => void // O 'dispatcher' que o clique vai chamar
+  response: ReportData,
+  onDrilldownClick: (type: 'by_month' | 'by_store', value: string, context?: Record<string, any>) => void// O 'dispatcher' que o clique vai chamar
 ) {
-  const { data, context } = response; // 'context' é o novo campo que vem do store
+  const { data, context, store_name } = response;// 'context' é o novo campo que vem do store
 
   // Helper (função dentro de função)
   const formatValue = (value: any, key: string) => {
@@ -139,10 +139,12 @@ function getChartOptions(
 
     onEvents: {
       'click': (params: any) => {
+        const currentContext = { store_name: store_name };
         // 'params.name' é o valor do eixo X (ex: "2025-05")
         if (dimensionKey === 'mes_ano') { 
-          console.log('CLICOU NO MÊS:', params.name);
-          onDrilldownClick(params.name); // Chama o dispatcher do store!
+          onDrilldownClick('by_month', params.name, currentContext); 
+        } else if (dimensionKey === 'store_name') {
+          onDrilldownClick('by_store', params.name, {}); // Começa um novo contexto de loja
         }
       }
     }
@@ -181,9 +183,11 @@ function getChartOptions(
 
     onEvents: {
       'click': (params: any) => {
-        if (dimensionKey === 'mes_ano') {
-          console.log('CLICOU NO MÊS:', params.name);
-          onDrilldownClick(params.name);
+        const currentContext = { store_name: store_name };
+        if (dimensionKey === 'mes_ano') { 
+          onDrilldownClick('by_month', params.name, currentContext);
+        } else if (dimensionKey === 'store_name') {
+          onDrilldownClick('by_store', params.name, {});
         }
       }
     }
