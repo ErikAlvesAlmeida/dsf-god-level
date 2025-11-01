@@ -1,6 +1,5 @@
 import { Alert, Spin, Table, Typography, Tabs } from 'antd';
 import type { TabsProps } from 'antd';
-import { useDashboardStore } from '../store/dashboardStore';
 import type { ReportData } from '../types/analytics';
 import ReactECharts from 'echarts-for-react';
 import * as echarts from 'echarts/core';
@@ -31,14 +30,9 @@ const COLOR_PALETTE = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#
 
 function getChartOptions(
   response: ReportData, 
-  // --- MUDANÇA 1: Simplificamos esta assinatura ---
-  onDrilldownClick: (
-    type: 'by_month' | 'by_channel_to_products', 
-    value: string, 
-    context?: Record<string, any>
-  ) => void,
-  // --- MUDANÇA 2: Adicionamos a nova ação para a sua visão ---
-  onStoreDetailClick: (storeName: string) => void 
+  // --- MUDANÇA: A assinatura agora é "burra" e genérica ---
+  // Ela só recebe UMA função de clique (opcional) do "Pai"
+  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void 
 ){
   const { data, context, store_name } = response;// 'context' é o novo campo que vem do store
 
@@ -73,8 +67,7 @@ function getChartOptions(
       }
       return dateStr; // Fallback
     });
-    
-    // 3. O 'series' é igual ao seu código antigo
+
     const series = channels.map(channel => ({
       name: channel,
       type: 'bar',
@@ -109,11 +102,10 @@ function getChartOptions(
       legend: { data: channels, top: 30 },
       grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
       toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
-      
-      // --- ESTAS SÃO AS MUDANÇAS ---
+
       xAxis: { 
         type: 'category', 
-        data: daysFormatted, // <-- Usa as datas formatadas
+        data: daysFormatted, // <-- As datas formatadas
         axisLabel: {
           interval: 0, // Mostra todos os labels
           rotate: 30   // Rotaciona para caber
@@ -121,12 +113,11 @@ function getChartOptions(
       },
       yAxis: { type: 'value', axisLabel: { formatter: (val: number) => formatValue(val, 'faturamento') } },
       series: series,
-      // Adiciona o DataZoom (scroll) que você pediu
+      // Adiciona o DataZoom (scroll)
       dataZoom: [ 
         { type: 'inside', start: 0, end: 100 },
         { type: 'slider', start: 0, end: 100, show: true } 
       ]
-      // --- FIM DAS MUDANÇAS ---
     };
   }
 
@@ -136,26 +127,26 @@ function getChartOptions(
   if (!dimensionKey || !metricKey) {
     return null;
   }
+
+  const chartData = data; 
   
   const barOption = {
     color: COLOR_PALETTE,
     tooltip: { 
       trigger: 'axis',
       formatter: (params: any[]) => {
-        // ... (sua lógica de 'formatter' está 100% CORRETA) ...
         const param = params[0];
         const dimension = param.axisValueLabel;
         const value = param.value;
         return `${dimension}<br /><strong>${formatValue(value, metricKey)}</strong>`;
       }
     },
-    // ... (legend, grid, toolbox, xAxis, yAxis, series, dataZoom - TUDO 100% CORRETO) ...
     legend: { data: [metricKey] },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
     xAxis: {
       type: 'category',
-      data: data.map((row: any) => row[dimensionKey]),
+      data: chartData.map((row: any) => row[dimensionKey]), 
     },
     yAxis: {
       type: 'value',
@@ -165,35 +156,23 @@ function getChartOptions(
       {
         name: metricKey,
         type: 'bar',
-        data: data.map((row: any) => row[metricKey]),
+        data: chartData.map((row: any) => row[metricKey]),
         colorBy: 'data'
       },
     ],
     dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', start: 0, end: 100 } ],
 
-    // --- ESTA É A MUDANÇA (LÓGICA DA FASE 10) ---
     onEvents: {
       'click': (params: any) => {
-        const currentContext = { store_name: store_name };
-        const clickedValue = params.name;
-
-        // Se o relatório PAI (context) for um de Lojas...
-        if (context === 'sales_by_store' || context === 'products_by_store') {
-            // ...chame a nova ação de "mudar de página".
-            onStoreDetailClick(clickedValue);
-        }
-        // Senão, use o drilldown antigo (que ficou simplificado)
-        else if (dimensionKey === 'mes_ano') { 
-          onDrilldownClick('by_month', clickedValue, currentContext);
-        } else if (dimensionKey === 'channel_name') {
-          onDrilldownClick('by_channel_to_products', clickedValue, {});
+        if (onChartClick && context) {
+          // 2. Devolve o "contexto" do gráfico (ex: 'sales_by_month_for_store')
+          //    e o "valor" (ex: '2025-05')
+          onChartClick(context, params.name);
         }
       }
     }
-    // --- FIM DA MUDANÇA ---
   };
 
-// ... (cole isso depois do 'barOption = { ... };') ...
 
   const pieOption = {
     color: COLOR_PALETTE,
@@ -201,12 +180,10 @@ function getChartOptions(
     tooltip: { 
       trigger: 'item',
       formatter: (param: any) => {
-        // ... (sua lógica de 'formatter' está 100% CORRETA) ...
         const { name, value, percent } = param;
         return `${name}<br /><strong>${formatValue(value, metricKey)}</strong> (${percent}%)`;
       }
     },
-    // ... (legend, toolbox, series, emphasis - TUDO 100% CORRETO) ...
     legend: { orient: 'vertical', left: 'left' },
     toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
     series: [
@@ -214,92 +191,78 @@ function getChartOptions(
         name: metricKey,
         type: 'pie',
         radius: '50%',
-        data: data.map((row: any) => ({
+        data: data.map((row: any) => ({ 
           value: row[metricKey],
           name: row[dimensionKey],
         })),
         emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        }
       }
     ],
 
-    // --- ESTA É A MUDANÇA (LÓGICA DA FASE 10) ---
     onEvents: {
       'click': (params: any) => {
-        const currentContext = { store_name: store_name };
-        const clickedValue = params.name; // 'params.name' é o nome da fatia
-
-        // (Exatamente a mesma lógica do 'barOption')
-        
-        // Se o relatório PAI (context) for um de Lojas...
-        if (context === 'sales_by_store' || context === 'products_by_store') {
-            // ...chame a nova ação de "mudar de página".
-            onStoreDetailClick(clickedValue);
-        }
-        // Senão, use o drilldown antigo
-        else if (dimensionKey === 'mes_ano') { 
-          onDrilldownClick('by_month', clickedValue, currentContext);
-        } else if (dimensionKey === 'channel_name') {
-          onDrilldownClick('by_channel_to_products', clickedValue, {});
+        // 1. Verifica se o "Pai" (VendasPorLojaView) passou a função
+        if (onChartClick && context) {
+          // 2. Devolve o "contexto" do gráfico (ex: 'sales_by_month_for_store')
+          //    e o "valor" (ex: '2025-05')
+          onChartClick(context, params.name);
         }
       }
     }
-    // --- FIM DA MUDANÇA ---
   };
 
-// ... (cole isso depois do 'pieOption = { ... };') ...
-
-  // (Esta parte está 100% CORRETA)
   if (data.length <= 7) {
     return pieOption;
   }
   return barOption;
 }
-// --- FIM DA getChartOptions ---
 
-
-// --- MUDANÇA 1: Definir as Props que o componente espera ---
+// --- Define as Props que o componente espera ---
 interface DataDisplayProps {
-  reportData: ReportData | null;
-  isLoading: boolean;
-  error: string | null;
+  reportData: ReportData | null;
+  isLoading: boolean;
+  error: string | null;
+  // A "prop" que o 'VendasPorLojaView' (o Pai) está passando
+  onChartClick?: (type: string, value: string) => void; 
 }
 
-// --- MUDANÇA 2: O componente agora RECEBE props ---
-export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) {
+// --- O componente agora RECEBE props ---
+export function DataDisplay({ reportData, isLoading, error, onChartClick }: DataDisplayProps) {
 
-  // --- MUDANÇA 3: Pega SÓ AS AÇÕES do store ---
-  const fetchDrilldownReport = useDashboardStore((state) => state.fetchDrilldownReport);
-  const fetchStoreDetail = useDashboardStore((state) => state.fetchStoreDetail);
+  // --- DELETADO: Removemos TODAS as chamadas ao useDashboardStore ---
+  // (Este componente não fala mais com o store,
+  // ele só recebe props. Isso MATA o loop infinito.)
 
-  // (O 'if (isLoading)' e 'if (error)' agora usam as props!)
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>
-        <Spin tip="Carregando dados..." size="large" />
-      </div>
-    );
-  }
-  if (error) {
-    return <Alert message="Erro ao carregar relatório" description={error} type="error" showIcon />;
-  }
-  
-  // (O 'if (!reportData)' agora usa a prop!)
-  if (!reportData || reportData.data.length === 0) {
-    // Vamos adicionar o wrapper aqui também para consistência
-    return (
-       <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
-         <Alert message="Nenhum dado para exibir" description="Selecione um relatório no menu ao lado." type="info" />
-       </div>
-    );
-  }
+  // (O 'if (isLoading)' agora usa a prop 'isLoading' - 100% CORRETO)
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>
+        <Spin tip="Carregando dados..." size="large" />
+      </div>
+    );
+  }
 
-  // (A lógica de 'columns' está 100% CORRETA)
+  // (O 'if (error)' está 100% CORRETO)
+  if (error) {
+    return <Alert message="Erro ao carregar relatório" description={error} type="error" showIcon />;
+  }
+
+  // (O 'if (!reportData)' está 100% CORRETO)
+  if (!reportData || reportData.data.length === 0) {
+    // O wrapper para consistência
+    return (
+       <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
+         <Alert message="Nenhum dado para exibir" description="Selecione um relatório no menu ao lado." type="info" />
+       </div>
+    );
+  }
+
   const columns = Object.keys(reportData.data[0]).map((key) => ({
     title: key.replace(/_/g, ' ').toUpperCase(),
     dataIndex: key,
@@ -311,7 +274,6 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
       const valB = b[key];
 
       if (typeof valA === 'number' && typeof valB === 'number') {
-        // Substitui a[key] - b[key] por esta lógica
         if (valA > valB) return 1;
         if (valA < valB) return -1;
         return 0;
@@ -322,7 +284,6 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
       return 0;
     },
     render: (value: any) => {
-      // (A sua lógica de 'render' está 100% CORRETA)
       if (typeof value === 'number') {
         if (key.includes('faturamento') || key.includes('ticket_medio')) {
           return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -335,14 +296,11 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
     },
   }));
   
-  // --- MUDANÇA 4: Passa as DUAS ações para o getChartOptions ---
-  const chartOption = getChartOptions(reportData, fetchDrilldownReport, fetchStoreDetail); 
+  const chartOption = getChartOptions(reportData, onChartClick);
 
-  // --- MUDANÇA 5 (Bônus/UX): Label dinâmico para o Tab ---
   const tabItems: TabsProps['items'] = [
     {
       key: '1',
-      // O label agora é "inteligente"
       label: reportData.context === 'daily_stacked_histogram' ? 'Gráfico Diário' : 'Gráfico',
       disabled: !chartOption, 
       children: chartOption ? (
@@ -351,7 +309,6 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
           option={chartOption}
           style={{ height: '400px', width: '100%' }}
           notMerge={true}
-          // A sua lógica de 'onEvents' aqui estava 100% CORRETA
           onEvents={(chartOption as any)?.onEvents}
         />
       ) : <Alert type="info" message="Não foi possível gerar um gráfico para esta combinação de dados." />,
@@ -361,7 +318,6 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
       label: 'Tabela de Dados (Completa)',
       children: (
         <Table
-          // (Toda a sua lógica da Tabela está 100% CORRETA)
           columns={columns}
           dataSource={reportData.data}
           rowKey={(_, index) => `row-${index}`}
@@ -374,7 +330,6 @@ export function DataDisplay({ reportData, isLoading, error }: DataDisplayProps) 
     },
   ];
 
-  // (O seu 'return' está 100% CORRETO)
   return (
     <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
       <Title level={3} style={{ marginTop: 0 }}>{reportData.title}</Title>

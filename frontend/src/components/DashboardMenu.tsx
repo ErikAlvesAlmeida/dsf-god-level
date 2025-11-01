@@ -1,6 +1,6 @@
 // src/components/DashboardMenu.tsx
 import { Menu } from 'antd';
-import type { MenuProps } from 'antd'; // Importa o tipo
+import type { MenuProps } from 'antd';
 import { 
   AreaChartOutlined, 
   ShopOutlined, 
@@ -11,29 +11,24 @@ import {
 } from '@ant-design/icons';
 import { useDashboardStore } from '../store/dashboardStore';
 
-// Mapeamento (não muda)
 const reportMap: Record<string, { endpoint: string, title: string, params?: Record<string, any> }> = {
-  'sales_by_store': { endpoint: '/reports/sales_by_store', title: 'Vendas por Loja' },
-  'sales_by_channel': { endpoint: '/reports/sales_by_channel', title: 'Vendas por Canal' },
-  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Faturamento por Mês' },
-  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top Produtos' },
+  'sales_by_channel': { endpoint: '/reports/sales_by_channel', title: 'Vendas por Canal (Global)' },
+  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Faturamento por Mês (Global)' },
+  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top Produtos (Global)' },
   'payment_types': { endpoint: '/reports/sales_by_payment_type', title: 'Formas de Pagamento' },
   'delivery_performance_worst': { endpoint: '/reports/delivery_by_neighborhood', title: 'Piores Entregas', params: { order_by_asc: false } },
   'delivery_performance_best': { endpoint: '/reports/delivery_by_neighborhood', title: 'Melhores Entregas', params: { order_by_asc: true } },
-  'products_by_store': { endpoint: '/reports/sales_by_store', title: 'Produtos por Loja' },
 };
 
-// --- MUDANÇA: Definir os 'items' do menu como um array ---
-type MenuItem = Required<MenuProps>['items'][number];
-
-const menuItems: MenuItem[] = [
-  { key: 'sales_by_store', icon: <ShopOutlined />, label: 'Vendas por Loja' },
-  { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal' },
-  { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês' },
-  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos' },
+const menuItems: MenuProps['items'] = [
+  // Esta é a 'key' do Funil 
+  { key: 'vendas_por_loja', icon: <ShopOutlined />, label: 'Vendas por Loja (Funil)' }, 
+  
+  // Estas são as 'keys' dos Relatórios Globais
+  { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal (Global)' },
+  { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês (Global)' },
+  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos (Global)' },
   { key: 'payment_types', icon: <DollarOutlined />, label: 'Formas de Pagamento' },
-  { key: 'products_by_store', icon: <ShoppingOutlined />, label: 'Produtos por Loja' },
-  // (Grupo para Entregas)
   { 
     key: 'delivery', 
     icon: <EnvironmentOutlined />, 
@@ -44,16 +39,23 @@ const menuItems: MenuItem[] = [
     ]
   },
 ];
-// --- FIM DA MUDANÇA ---
 
 
 export function DashboardMenu() {
-  const fetchReport = useDashboardStore((state) => state.fetchReport);
+  const showFunilLojaView = useDashboardStore((state) => state.showFunilLojaView);
+  const fetchGlobalReport = useDashboardStore((state) => state.fetchGlobalReport);
 
-  const handleClick: MenuProps['onClick'] = (e) => { // Tipo atualizado
-    const reportInfo = reportMap[e.key];
-    if (reportInfo) {
-      fetchReport(reportInfo.endpoint, reportInfo.title, reportInfo.params); 
+  const handleClick: MenuProps['onClick'] = (e) => {
+    if (e.key === 'vendas_por_loja') {
+      // 1. Se clicou no "Funil", chama a ação do funil
+      showFunilLojaView();
+      
+    } else {
+      // 2. Senão, busca o relatório global
+      const reportInfo = reportMap[e.key];
+      if (reportInfo) {
+        fetchGlobalReport(reportInfo.endpoint, reportInfo.title, reportInfo.params); 
+      }
     }
   };
 
@@ -63,9 +65,8 @@ export function DashboardMenu() {
       theme="light"
       onClick={handleClick}
       style={{ height: '100%', borderRight: 0 }}
-      defaultSelectedKeys={['sales_by_store']}
-      defaultOpenKeys={['delivery']} // Abre o sub-menu de entrega
-      // --- MUDANÇA: Passa os 'items' como prop ---
+      defaultSelectedKeys={['vendas_por_loja']} // Começa no funil
+      defaultOpenKeys={['delivery']}
       items={menuItems} 
     />
   );

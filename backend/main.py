@@ -47,6 +47,21 @@ async def get_kpi_summary():
     """
     return run_query(query)
 
+
+@app.get("/api/v2/data/stores_list")
+async def get_stores_list():
+    """
+    (Fase 12) Retorna uma lista simples de todos os nomes de lojas.
+    Para o seu novo 'Select-box'.
+    """
+    query = """
+    SELECT DISTINCT store_name
+    FROM fct_sales
+    ORDER BY store_name;
+    """
+    return run_query(query)
+
+
 @app.get("/api/v2/reports/sales_by_store")
 async def get_sales_by_store():
     """QUAL LOJA VENDEU MAIS/MENOS"""
@@ -234,12 +249,14 @@ async def get_top_products_by_channel(channel_name: str):
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
 
 @app.get("/api/v2/reports/top_products_by_store")
-async def get_top_products_by_store(store_name: str):
+async def get_top_products_by_store(store_name: str, mes_ano: Optional[str] = None):
     """
     Feature B: Drill-down por Loja para Produtos.
-    Retorna o faturamento por produto para uma loja específica.
+    aceita um 'mes_ano' opcional para "cross-filtering".
     """
-    print(f"Buscando Top Produtos para a Loja: {store_name}")
+    print(f"Buscando Top Produtos para Loja: {store_name}, Mês: {mes_ano}")
+    
+    params = [store_name] # Parâmetro 1 (obrigatório)
     
     query = f"""
     SELECT
@@ -248,6 +265,14 @@ async def get_top_products_by_store(store_name: str):
         SUM(product_quantity) AS quantidade
     FROM fct_product_sales
     WHERE store_name = ?  -- Filtra pela LOJA
+    """
+    
+    # --- (Cross-filter) ---
+    if mes_ano:
+        query += " AND mes_ano = ? "
+        params.append(mes_ano) # Parâmetro 2 (opcional)
+        
+    query += """
     GROUP BY product_name
     ORDER BY faturamento DESC
     LIMIT 20;
@@ -255,7 +280,8 @@ async def get_top_products_by_store(store_name: str):
     
     try:
         conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
-        result = conn.execute(query, [store_name]).df().to_dict(orient='records')
+        # Passa a lista de parâmetros (1 ou 2)
+        result = conn.execute(query, params).df().to_dict(orient='records')
         conn.close()
         return result
     except Exception as e:
@@ -280,6 +306,34 @@ async def get_kpi_summary_for_store(store_name: str):
     try:
         conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
         result = conn.execute(query, [store_name]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/sales_by_channel_detail")
+async def get_sales_by_channel_detail(store_name: str, mes_ano: str):
+    """
+    Drill-down Mês -> Canal
+    Retorna o faturamento por canal PARA UMA LOJA E MÊS específicos.
+    """
+    print(f"Buscando Vendas por Canal para Loja: {store_name}, Mês: {mes_ano}")
+    
+    params = [store_name, mes_ano]
+    
+    query = f"""
+    SELECT
+        channel_name,
+        SUM(sale_total_amount) AS faturamento
+    FROM fct_sales
+    WHERE store_name = ? AND mes_ano = ?
+    GROUP BY channel_name
+    ORDER BY faturamento DESC;
+    """
+    
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        result = conn.execute(query, params).df().to_dict(orient='records')
         conn.close()
         return result
     except Exception as e:
