@@ -1,4 +1,6 @@
+// src/components/DashboardMenu.tsx
 import { Menu } from 'antd';
+import type { MenuProps } from 'antd'; // Importa o tipo
 import { 
   AreaChartOutlined, 
   ShopOutlined, 
@@ -9,34 +11,49 @@ import {
 } from '@ant-design/icons';
 import { useDashboardStore } from '../store/dashboardStore';
 
-// Mapeamento das chaves do menu para os endpoints e títulos
+// Mapeamento (não muda)
 const reportMap: Record<string, { endpoint: string, title: string, params?: Record<string, any> }> = {
-  'kpi_summary': { endpoint: '/reports/kpi_summary', title: 'Resumo de KPIs' },
   'sales_by_store': { endpoint: '/reports/sales_by_store', title: 'Vendas por Loja' },
   'sales_by_channel': { endpoint: '/reports/sales_by_channel', title: 'Vendas por Canal' },
-  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Vendas por Mês (Linha do Tempo)' },
-  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top 20 Produtos por Faturamento' },
-  'payment_types': { endpoint: '/reports/sales_by_payment_type', title: 'Vendas por Forma de Pagamento' },
-  'delivery_performance_worst': { 
-    endpoint: '/reports/delivery_by_neighborhood', 
-    title: 'Top 20 Piores Entregas por Bairro', 
-    params: { order_by_asc: false } 
-  },
-  'delivery_performance_best': { 
-    endpoint: '/reports/delivery_by_neighborhood', 
-    title: 'Top 20 Melhores Entregas por Bairro', 
-    params: { order_by_asc: true } 
-  },
+  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Faturamento por Mês' },
+  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top Produtos' },
+  'payment_types': { endpoint: '/reports/sales_by_payment_type', title: 'Formas de Pagamento' },
+  'delivery_performance_worst': { endpoint: '/reports/delivery_by_neighborhood', title: 'Piores Entregas', params: { order_by_asc: false } },
+  'delivery_performance_best': { endpoint: '/reports/delivery_by_neighborhood', title: 'Melhores Entregas', params: { order_by_asc: true } },
+  'products_by_store': { endpoint: '/reports/sales_by_store', title: 'Produtos por Loja' },
 };
 
+// --- MUDANÇA: Definir os 'items' do menu como um array ---
+type MenuItem = Required<MenuProps>['items'][number];
+
+const menuItems: MenuItem[] = [
+  { key: 'sales_by_store', icon: <ShopOutlined />, label: 'Vendas por Loja' },
+  { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal' },
+  { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês' },
+  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos' },
+  { key: 'payment_types', icon: <DollarOutlined />, label: 'Formas de Pagamento' },
+  { key: 'products_by_store', icon: <ShoppingOutlined />, label: 'Produtos por Loja' },
+  // (Grupo para Entregas)
+  { 
+    key: 'delivery', 
+    icon: <EnvironmentOutlined />, 
+    label: 'Performance de Entrega',
+    children: [
+      { key: 'delivery_performance_worst', label: 'Piores Entregas' },
+      { key: 'delivery_performance_best', label: 'Melhores Entregas' },
+    ]
+  },
+];
+// --- FIM DA MUDANÇA ---
+
+
 export function DashboardMenu() {
-  // Conecta ao nosso novo store
   const fetchReport = useDashboardStore((state) => state.fetchReport);
 
-  const handleClick = (e: { key: string }) => {
+  const handleClick: MenuProps['onClick'] = (e) => { // Tipo atualizado
     const reportInfo = reportMap[e.key];
     if (reportInfo) {
-      fetchReport(reportInfo.endpoint, reportInfo.title, reportInfo.params);
+      fetchReport(reportInfo.endpoint, reportInfo.title, reportInfo.params); 
     }
   };
 
@@ -47,31 +64,9 @@ export function DashboardMenu() {
       onClick={handleClick}
       style={{ height: '100%', borderRight: 0 }}
       defaultSelectedKeys={['sales_by_store']}
-    >
-      <Menu.Item key="sales_by_store" icon={<ShopOutlined />}>
-        Vendas por Loja
-      </Menu.Item>
-      <Menu.Item key="sales_by_channel" icon={<AppstoreOutlined />}>
-        Vendas por Canal
-      </Menu.Item>
-      <Menu.Item key="sales_by_month" icon={<AreaChartOutlined />}>
-        Faturamento por Mês
-      </Menu.Item>
-      <Menu.Item key="top_products" icon={<ShoppingOutlined />}>
-        Top Produtos
-      </Menu.Item>
-      <Menu.Item key="payment_types" icon={<DollarOutlined />}>
-        Formas de Pagamento
-      </Menu.Item>
-      <Menu.Item key="delivery_performance_worst" icon={<EnvironmentOutlined />}>
-        Piores Entregas
-      </Menu.Item>
-      <Menu.Item key="delivery_performance_best" icon={<EnvironmentOutlined />}>
-        Melhores Entregas
-      </Menu.Item>
-      
-      {/* TODO: Adicionar os outros relatórios do seu roadmap... */}
-      
-    </Menu>
+      defaultOpenKeys={['delivery']} // Abre o sub-menu de entrega
+      // --- MUDANÇA: Passa os 'items' como prop ---
+      items={menuItems} 
+    />
   );
 }

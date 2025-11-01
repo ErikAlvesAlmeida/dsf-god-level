@@ -204,6 +204,86 @@ async def get_sales_by_month_for_store(store_name: str):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/top_products_by_channel")
+async def get_top_products_by_channel(channel_name: str):
+    """
+    Feature: Drill-down por Canal.
+    Retorna o faturamento por produto para um canal específico.
+    """
+    print(f"Buscando Top Produtos para o Canal: {channel_name}")
+    
+    query = f"""
+    SELECT
+        product_name,
+        SUM(product_total_price) AS faturamento,
+        SUM(product_quantity) AS quantidade
+    FROM fct_product_sales
+    WHERE channel_name = ?  -- Filtra pelo canal
+    GROUP BY product_name
+    ORDER BY faturamento DESC
+    LIMIT 20;
+    """
+    
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        result = conn.execute(query, [channel_name]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/top_products_by_store")
+async def get_top_products_by_store(store_name: str):
+    """
+    Feature B: Drill-down por Loja para Produtos.
+    Retorna o faturamento por produto para uma loja específica.
+    """
+    print(f"Buscando Top Produtos para a Loja: {store_name}")
+    
+    query = f"""
+    SELECT
+        product_name,
+        SUM(product_total_price) AS faturamento,
+        SUM(product_quantity) AS quantidade
+    FROM fct_product_sales
+    WHERE store_name = ?  -- Filtra pela LOJA
+    GROUP BY product_name
+    ORDER BY faturamento DESC
+    LIMIT 20;
+    """
+    
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        result = conn.execute(query, [store_name]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/kpi_summary_for_store")
+async def get_kpi_summary_for_store(store_name: str):
+    """
+    Feature: KPIs para o dashboard de detalhe da loja.
+    """
+    print(f"Buscando KPIs para a Loja: {store_name}")
+    
+    query = f"""
+    SELECT
+        SUM(sale_total_amount) AS faturamento_total,
+        AVG(sale_total_amount) AS ticket_medio,
+        COUNT(sale_id) AS total_vendas,
+        AVG(delivery_seconds / 60) AS avg_tempo_entrega_min
+    FROM fct_sales
+    WHERE store_name = ?;
+    """
+    try:
+        conn = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        result = conn.execute(query, [store_name]).df().to_dict(orient='records')
+        conn.close()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
 # --- FIM DOS ENDPOINTS ---
 
 @app.get("/")

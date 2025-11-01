@@ -1,9 +1,7 @@
-// src/components/KpiCards.tsx
 import { Card, Col, Row, Statistic, Skeleton } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
-import { useEffect } from 'react';
-import { useDashboardStore } from '../store/dashboardStore';
+import type { KpiData } from '../types/analytics';
 
+// (Helpers de formatação)
 const formatCurrency = (value: number) => 
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatNumber = (value: number) =>
@@ -11,17 +9,17 @@ const formatNumber = (value: number) =>
 const formatMinutes = (value: number) =>
   `${value.toFixed(2)} min`;
 
+// O componente agora define uma interface para suas 'Props' ---
+interface KpiCardsProps {
+  kpiData: KpiData | null;
+  isLoading: boolean;
+}
 
-export function KpiCards() {
-  const { kpiData, isLoadingKpis, error, fetchKpis } = useDashboardStore();
+// O componente agora RECEBE 'kpiData' e 'isLoading' ---
+export function KpiCards({ kpiData, isLoading }: KpiCardsProps) {
 
-  useEffect(() => {
-    // Busca os KPIs UMA VEZ quando o *componente* carregar
-    fetchKpis();
-  }, [fetchKpis]);
-
-  // 1. Estado de Carregamento
-  if (isLoadingKpis) {
+  // 1. Estado de Carregamento (lê da prop 'isLoading')
+  if (isLoading) {
     return (
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={12} md={6}><Skeleton active paragraph={{ rows: 2 }} /></Col>
@@ -32,14 +30,14 @@ export function KpiCards() {
     );
   }
 
-  // 2. Estado de Erro ou Vazio (Após o loading)
-  if (error || !kpiData) {
-    // Não renderiza nada se os KPIs falharam, para não poluir a UI.
-    // O erro será mostrado no console (ou poderíamos adicionar um <Alert> aqui)
+  // 2. Estado de Erro ou Vazio (lê da prop 'kpiData')
+  if (!kpiData) {
+    // Não renderiza nada se não houver dados
     return null;
   }
   
-  // 3. Estado de Sucesso
+  // 3. Estado de Sucesso (lê da prop 'kpiData')
+  // (O HTML/JSX abaixo é exatamente o mesmo que você já tinha)
   return (
     <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
       <Col xs={24} sm={12} md={6}>
@@ -78,7 +76,7 @@ export function KpiCards() {
             title="Tempo Médio de Entrega"
             value={formatMinutes(kpiData.avg_tempo_entrega_min)}
             precision={2}
-            valueStyle={{ color: '#cf1322' }} // Vermelho, pois tempo alto é ruim
+            valueStyle={{ color: '#cf1322' }}
           />
         </Card>
       </Col>
