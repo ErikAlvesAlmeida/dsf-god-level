@@ -42,7 +42,8 @@ async def get_kpi_summary():
         SUM(sale_total_amount) AS faturamento_total,
         AVG(sale_total_amount) AS ticket_medio,
         COUNT(sale_id) AS total_vendas,
-        AVG(delivery_seconds / 60) AS avg_tempo_entrega_min
+        AVG(delivery_seconds / 60) AS avg_tempo_entrega_min,
+        SUM(total_discount) AS total_descontos
     FROM fct_sales;
     """
     return run_query(query)
@@ -113,6 +114,23 @@ async def get_top_products_by_revenue():
     FROM fct_product_sales
     GROUP BY product_name
     ORDER BY faturamento DESC
+    LIMIT 20;
+    """
+    return run_query(query)
+
+@app.get("/api/v2/reports/worst_products_by_revenue")
+async def get_worst_products_by_revenue():
+    """
+    QUAL PRODUTO MENOS VENDEU
+    (O "oposto" do Top Produtos)
+    """
+    query = """
+    SELECT
+        product_name,
+        SUM(product_total_price) AS faturamento
+    FROM fct_product_sales
+    GROUP BY product_name
+    ORDER BY faturamento ASC 
     LIMIT 20;
     """
     return run_query(query)

@@ -26,6 +26,7 @@ echarts.use([
 ]);
 
 const { Title } = Typography;
+const BAR_OPTION_COLOR = ['#5b5b5bff']
 const COLOR_PALETTE = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#3BA272', '#FC8452'];
 
 function getChartOptions(
@@ -131,7 +132,7 @@ function getChartOptions(
   const chartData = data; 
   
   const barOption = {
-    color: COLOR_PALETTE,
+    color: BAR_OPTION_COLOR[0],
     tooltip: { 
       trigger: 'axis',
       formatter: (params: any[]) => {
@@ -164,8 +165,10 @@ function getChartOptions(
 
     onEvents: {
       'click': (params: any) => {
-        if (context === 'top_products' || 
-            context === 'payment_types' || 
+        if (context === 'top_products_by_revenue' || 
+            context === 'sales_by_payment_type' ||
+            context === 'top_products' ||
+            context === 'worst_products_by_revenue' || 
             context === 'delivery_by_neighborhood') 
         {
           return; // Fim. Não faz drill-down.
@@ -213,12 +216,15 @@ function getChartOptions(
     onEvents: {
       'click': (params: any) => {
         // 1. Verifica se o "Pai" (VendasPorLojaView) passou a função
-        if (context === 'top_products' || 
-            context === 'payment_types' || 
+        if (context === 'top_products_by_revenue' || 
+            context === 'sales_by_payment_type' || 
+            context === 'top_products' || 
+            context === 'worst_products_by_revenue' ||
             context === 'delivery_by_neighborhood') 
         {
           return; // Fim. Não faz drill-down.
         }
+        console.log(context)
         if (onChartClick && context) {
           const currentContext = { store_name: store_name };
           onChartClick(context, params.name, currentContext);

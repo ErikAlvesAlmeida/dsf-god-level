@@ -12,12 +12,13 @@ import {
 import { useDashboardStore } from '../store/dashboardStore';
 
 const reportMap: Record<string, { endpoint: string, title: string, params?: Record<string, any> }> = {
-  'sales_by_channel': { endpoint: '/reports/sales_by_channel', title: 'Vendas por Canal (Global)' },
-  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Faturamento por Mês (Global)' },
-  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top Produtos (Global)' },
+  'sales_by_channel': { endpoint: '/reports/sales_by_channel', title: 'Vendas por Canal' },
+  'sales_by_month': { endpoint: '/reports/sales_by_month', title: 'Faturamento por Mês' },
+  'worst_products': { endpoint: '/reports/worst_products_by_revenue', title: 'Piores Produtos' },
+  'top_products': { endpoint: '/reports/top_products_by_revenue', title: 'Top20 Produtos Que Mais Vendem' },
   'payment_types': { endpoint: '/reports/sales_by_payment_type', title: 'Formas de Pagamento' },
-  'delivery_performance_worst': { endpoint: '/reports/delivery_by_neighborhood', title: 'Piores Entregas', params: { order_by_asc: false } },
-  'delivery_performance_best': { endpoint: '/reports/delivery_by_neighborhood', title: 'Melhores Entregas', params: { order_by_asc: true } },
+  'delivery_performance_worst': { endpoint: '/reports/delivery_by_neighborhood', title: 'Piores Tempos Entregas', params: { order_by_asc: false } },
+  'delivery_performance_best': { endpoint: '/reports/delivery_by_neighborhood', title: 'Melhores Tempos Entregas', params: { order_by_asc: true } },
 };
 
 const menuItems: MenuProps['items'] = [
@@ -27,15 +28,16 @@ const menuItems: MenuProps['items'] = [
   // Estas são as 'keys' dos Relatórios Globais
   { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal' },
   { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês' },
-  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos' },
+  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Melhores Produtos' },
+  { key: 'worst_products', icon: <ShoppingOutlined />, label: 'Piores Produtos' },
   { key: 'payment_types', icon: <DollarOutlined />, label: 'Formas de Pagamento' },
   { 
     key: 'delivery', 
     icon: <EnvironmentOutlined />, 
     label: 'Performance de Entrega',
     children: [
-      { key: 'delivery_performance_worst', label: 'Piores Entregas' },
-      { key: 'delivery_performance_best', label: 'Melhores Entregas' },
+      { key: 'delivery_performance_worst', label: 'Piores Tempos Entregas' },
+      { key: 'delivery_performance_best', label: 'Melhores Tempos Entregas' },
     ]
   },
 ];

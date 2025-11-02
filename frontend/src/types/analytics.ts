@@ -4,6 +4,7 @@ export interface KpiData {
   ticket_medio: number;
   total_vendas: number;
   avg_tempo_entrega_min: number;
+  total_descontos: number;
 }
 
 // O tipo 'DataRow' (uma linha de dados genérica da API)

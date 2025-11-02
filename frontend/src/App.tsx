@@ -28,7 +28,7 @@ function App() {
   useEffect(() => {
     fetchKpis();
     // Carrega "Vendas por Canal" como o relatório padrão ao abrir
-    fetchGlobalReport('/reports/sales_by_channel', 'Vendas por Canal (Global)'); 
+    fetchGlobalReport('/reports/sales_by_channel', 'Vendas por Canal'); 
   }, [fetchKpis, fetchGlobalReport]);
 
   return (

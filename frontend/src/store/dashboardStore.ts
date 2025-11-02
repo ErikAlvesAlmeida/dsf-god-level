@@ -109,7 +109,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
     
     try {
-      // 2. Constrói a URL (lógica da Fase 9, 100% correta)
+      // Constrói a URL
       let url = `${API_BASE_URL}${endpoint}`;
       if (params) {
         const queryParts: string[] = [];
@@ -162,12 +162,11 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       newContext = 'daily_stacked_histogram';
       
     } else if (type === 'sales_by_channel') {
-      title = `Top Produtos (Canal: ${value})`;
+      title = `Top20 Produtos (Canal: ${value})`;
       url = `${API_BASE_URL}/reports/top_products_by_channel?channel_name=${encodeURIComponent(value)}`;
       newContext = 'top_products';
-    }
-    // (Adicione mais 'else if' aqui para outros drilldowns globais)
-    
+    } 
+   
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error('Erro no drilldown global');
@@ -274,7 +273,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         vendasPorLoja: {
           ...state.vendasPorLoja,
           productReport: {
-            title: `Top Produtos (${mesAno})`,
+            title: `Top20 Produtos (${mesAno})`,
             data: productData,
             context: 'top_products_detail'
           },
@@ -290,8 +289,4 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ error: err.message, vendasPorLoja: { ...get().vendasPorLoja, isLoadingDetail: false } });
     }
   },
-  
-  // (A 'resetStoreSelection' foi removida e substituída por 'showFunilLojaView')
-  // (A 'fetchDrilldownReport' foi removida pois o 'DataDisplay' será "burro")
-
 }));

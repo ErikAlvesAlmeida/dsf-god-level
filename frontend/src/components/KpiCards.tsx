@@ -6,8 +6,6 @@ const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const formatNumber = (value: number) =>
   new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
-const formatMinutes = (value: number) =>
-  `${value.toFixed(2)} min`;
 
 // O componente agora define uma interface para suas 'Props' ---
 interface KpiCardsProps {
@@ -73,8 +71,8 @@ export function KpiCards({ kpiData, isLoading }: KpiCardsProps) {
       <Col xs={24} sm={12} md={6}>
         <Card>
           <Statistic
-            title="Tempo Médio de Entrega"
-            value={formatMinutes(kpiData.avg_tempo_entrega_min)}
+            title="Total de Descontos (Custo)"
+            value={formatCurrency(kpiData.total_descontos)}
             precision={2}
             valueStyle={{ color: '#cf1322' }}
           />
