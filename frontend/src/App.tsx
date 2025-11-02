@@ -56,6 +56,11 @@ function App() {
                 isLoading={isLoadingGlobalReport}
                 error={error}
                 onChartClick={fetchDrilldownReport}
+                averageLineValue={
+                  globalReport?.context === 'delivery_by_neighborhood' 
+                    ? kpiData?.avg_tempo_entrega_min 
+                    : undefined
+                }
               />
             )}
           </Content>

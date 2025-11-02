@@ -33,7 +33,8 @@ function getChartOptions(
   response: ReportData, 
   // --- MUDANÇA: A assinatura agora é "burra" e genérica ---
   // Ela só recebe UMA função de clique (opcional) do "Pai"
-  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void 
+  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void,
+  averageLineValue?: number
 ){
   const { data, context, store_name } = response;// 'context' é o novo campo que vem do store
 
@@ -158,7 +159,22 @@ function getChartOptions(
         name: metricKey,
         type: 'bar',
         data: chartData.map((row: any) => row[metricKey]),
-        colorBy: 'data'
+        colorBy: 'data',
+        markLine: averageLineValue ? {
+          silent: true, // Não interativo
+          data: [{
+            yAxis: averageLineValue,
+            name: 'Média Geral',
+            lineStyle: {
+              color: '#cf1322', // Vermelho (cor do KPI)
+              type: 'dashed'
+            },
+            label: {
+              formatter: `Média: ${averageLineValue.toFixed(2)} min`,
+              position: 'insideEndTop'
+            }
+          }]
+        } : undefined
       },
     ],
     dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', start: 0, end: 100 } ],
@@ -246,10 +262,11 @@ interface DataDisplayProps {
   error: string | null;
   // A "prop" que o 'VendasPorLojaView' (o Pai) está passando
   onChartClick?: (type: string, value: string, context?: Record<string, any>) => void; 
+  averageLineValue?: number;
 }
 
 // --- O componente agora RECEBE props ---
-export function DataDisplay({ reportData, isLoading, error, onChartClick }: DataDisplayProps) {
+export function DataDisplay({ reportData, isLoading, error, onChartClick, averageLineValue }: DataDisplayProps) {
 
   // (O 'if (isLoading)' agora usa a prop 'isLoading')
   if (isLoading) {
@@ -308,7 +325,7 @@ export function DataDisplay({ reportData, isLoading, error, onChartClick }: Data
     },
   }));
   
-  const chartOption = getChartOptions(reportData, onChartClick);
+  const chartOption = getChartOptions(reportData, onChartClick, averageLineValue);
 
   const tabItems: TabsProps['items'] = [
     {
