@@ -10,3 +10,131 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Força scroll horizontal suave em tabelas pequenas */
+.ant-table-wrapper {
+  overflow-x: auto;
+}
+
+/* Ajusta padding do conteúdo em mobile */
+@media (max-width: 768px) {
+  .ant-layout-content {
+    padding: 12px !important;
+  }
+  
+  /* Reduz padding dos cards em mobile */
+  .ant-card {
+    margin-bottom: 12px;
+  }
+  
+  /* Ajusta título do dashboard em mobile */
+  .ant-layout-header {
+    padding: 0 16px !important;
+    font-size: 16px !important;
+    height: auto !important;
+    line-height: 1.4 !important;
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+  }
+  
+  /* Força quebra de linha em títulos longos */
+  .ant-typography h3 {
+    font-size: 18px !important;
+    word-break: break-word;
+  }
+  
+  .ant-typography h5 {
+    font-size: 14px !important;
+  }
+  
+  /* Ajusta estatísticas dos KPIs */
+  .ant-statistic-title {
+    font-size: 12px !important;
+  }
+  
+  .ant-statistic-content {
+    font-size: 18px !important;
+  }
+  
+  /* Ajusta switches e botões em mobile */
+  .ant-space-horizontal {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Ajusta Select em mobile */
+  .ant-select {
+    font-size: 14px;
+  }
+  
+  /* Reduz altura das tabs em mobile */
+  .ant-tabs-tab {
+    padding: 8px 12px !important;
+    font-size: 13px !important;
+  }
+}
+
+/* Ajustes para tablets */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .ant-layout-content {
+    padding: 20px !important;
+  }
+  
+  .ant-statistic-content {
+    font-size: 20px !important;
+  }
+}
+
+/* Garante que gráficos sejam responsivos */
+.echarts-for-react {
+  width: 100% !important;
+}
+
+/* Ajusta altura mínima dos gráficos em mobile */
+@media (max-width: 768px) {
+  .echarts-for-react > div {
+    min-height: 300px !important;
+  }
+}
+
+/* Estilo para containers de conteúdo */
+.content-card {
+  background-color: #ffffff;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 768px) {
+  .content-card {
+    padding: 16px;
+    border-radius: 4px;
+  }
+}
+
+/* Melhora visualização de tabelas em mobile */
+@media (max-width: 768px) {
+  .ant-table {
+    font-size: 12px;
+  }
+  
+  .ant-table-thead > tr > th {
+    padding: 8px 4px !important;
+    font-size: 11px !important;
+  }
+  
+  .ant-table-tbody > tr > td {
+    padding: 8px 4px !important;
+    font-size: 12px !important;
+  }
+  
+  /* Reduz paginação em mobile */
+  .ant-pagination {
+    font-size: 12px;
+  }
+  
+  .ant-pagination-item {
+    min-width: 28px !important;
+    height: 28px !important;
+    line-height: 26px !important;
+  }
+}

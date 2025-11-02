@@ -1,4 +1,5 @@
 import { Alert, Spin, Table, Typography, Tabs } from 'antd';
+import { useState, useEffect } from 'react';
 import type { TabsProps } from 'antd';
 import type { ReportData } from '../types/analytics';
 import ReactECharts from 'echarts-for-react';
@@ -13,7 +14,6 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
-// 2. Registra os componentes do ECharts
 echarts.use([
   TitleComponent,
   TooltipComponent,
@@ -31,14 +31,12 @@ const COLOR_PALETTE = ['#5470C6', '#91CC75', '#FAC858', '#EE6666', '#73C0DE', '#
 
 function getChartOptions(
   response: ReportData, 
-  // --- MUDANÇA: A assinatura agora é "burra" e genérica ---
-  // Ela só recebe UMA função de clique (opcional) do "Pai"
   onChartClick?: (type: string, value: string, context?: Record<string, any>) => void,
-  averageLineValue?: number
+  averageLineValue?: number,
+  isMobile?: boolean
 ){
-  const { data, context, store_name } = response;// 'context' é o novo campo que vem do store
+  const { data, context, store_name } = response;
 
-  // Helper (função dentro de função)
   const formatValue = (value: any, key: string) => {
     if (typeof value !== 'number') return value;
     
@@ -55,19 +53,16 @@ function getChartOptions(
   };
 
   if (context === 'daily_stacked_histogram') {
-  
-    // 1. Pega os dias "crus" (ex: "2025-05-01")
     const daysRaw = [...new Set(data.map((d: any) => d.data_venda))].sort();
     const channels = [...new Set(data.map((d: any) => d.channel_name))];
 
-    // 2. Cria as legendas formatadas (ex: "01/05")
     const daysFormatted = daysRaw.map(dateStr => {
-      const dateOnly = dateStr.split('T')[0]; // Resultado: "2025-05-01"
-      const parts = dateOnly.split('-'); // Resultado: ["2025", "05", "01"]
+      const dateOnly = dateStr.split('T')[0];
+      const parts = dateOnly.split('-');
       if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}`; // "01/05"
+        return `${parts[2]}/${parts[1]}`;
       }
-      return dateStr; // Fallback
+      return dateStr;
     });
 
     const series = channels.map(channel => ({
@@ -81,12 +76,12 @@ function getChartOptions(
       })
     }));
 
-    // 4. Retorna o objeto de opções COMPLETO
     return {
       color: COLOR_PALETTE,
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
+        confine: true, // Mantém tooltip dentro do gráfico em mobile
         formatter: (params: any[]) => {
           let tooltip = `${params[0].axisValueLabel}<br/>`;
           let dayTotal = 0;
@@ -101,24 +96,40 @@ function getChartOptions(
           return tooltip;
         }
       },
-      legend: { data: channels, top: 30 },
-      grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+      legend: { 
+        data: channels, 
+        top: 30,
+        type: isMobile ? 'scroll' : 'plain', // Scroll em mobile
+        orient: isMobile ? 'horizontal' : 'horizontal',
+      },
+      grid: { 
+        left: isMobile ? '5%' : '3%', 
+        right: isMobile ? '5%' : '4%', 
+        bottom: isMobile ? '15%' : '10%', 
+        top: isMobile ? '25%' : '20%',
+        containLabel: true 
+      },
       toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
-
       xAxis: { 
         type: 'category', 
-        data: daysFormatted, // <-- As datas formatadas
+        data: daysFormatted,
         axisLabel: {
-          interval: 0, // Mostra todos os labels
-          rotate: 30   // Rotaciona para caber
+          interval: isMobile ? 'auto' : 0,
+          rotate: isMobile ? 45 : 30,
+          fontSize: isMobile ? 10 : 12,
         }
       },
-      yAxis: { type: 'value', axisLabel: { formatter: (val: number) => formatValue(val, 'faturamento') } },
+      yAxis: { 
+        type: 'value', 
+        axisLabel: { 
+          formatter: (val: number) => formatValue(val, 'faturamento'),
+          fontSize: isMobile ? 10 : 12,
+        } 
+      },
       series: series,
-      // Adiciona o DataZoom (scroll)
       dataZoom: [ 
         { type: 'inside', start: 0, end: 100 },
-        { type: 'slider', start: 0, end: 100, show: true } 
+        { type: 'slider', start: 0, end: 100, show: !isMobile, height: isMobile ? 20 : 30 } 
       ]
     };
   }
@@ -136,6 +147,7 @@ function getChartOptions(
     color: BAR_OPTION_COLOR[0],
     tooltip: { 
       trigger: 'axis',
+      confine: true,
       formatter: (params: any[]) => {
         const param = params[0];
         const dimension = param.axisValueLabel;
@@ -144,15 +156,28 @@ function getChartOptions(
       }
     },
     legend: { data: [metricKey] },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
+    grid: { 
+      left: isMobile ? '5%' : '3%', 
+      right: isMobile ? '5%' : '4%', 
+      bottom: isMobile ? '15%' : '3%', 
+      containLabel: true 
+    },
+    toolbox: { feature: { saveAsImage: { title: 'Salvar' } } },
     xAxis: {
       type: 'category',
-      data: chartData.map((row: any) => row[dimensionKey]), 
+      data: chartData.map((row: any) => row[dimensionKey]),
+      axisLabel: {
+        rotate: isMobile ? 45 : 0,
+        fontSize: isMobile ? 10 : 12,
+        interval: isMobile ? 'auto' : 0,
+      }
     },
     yAxis: {
       type: 'value',
-      axisLabel: { formatter: (value: number) => formatValue(value, metricKey) }
+      axisLabel: { 
+        formatter: (value: number) => formatValue(value, metricKey),
+        fontSize: isMobile ? 10 : 12,
+      }
     },
     series: [
       {
@@ -161,24 +186,27 @@ function getChartOptions(
         data: chartData.map((row: any) => row[metricKey]),
         colorBy: 'data',
         markLine: averageLineValue ? {
-          silent: true, // Não interativo
+          silent: true,
           data: [{
             yAxis: averageLineValue,
             name: 'Média Geral',
             lineStyle: {
-              color: '#cf1322', // Vermelho (cor do KPI)
+              color: '#cf1322',
               type: 'dashed'
             },
             label: {
               formatter: `Média: ${averageLineValue.toFixed(2)} min`,
-              position: 'insideEndTop'
+              position: 'insideEndTop',
+              fontSize: isMobile ? 10 : 12,
             }
           }]
         } : undefined
       },
     ],
-    dataZoom: [ { type: 'inside', start: 0, end: 100 }, { type: 'slider', start: 0, end: 100 } ],
-
+    dataZoom: [ 
+      { type: 'inside', start: 0, end: 100 }, 
+      { type: 'slider', start: 0, end: 100, show: !isMobile, height: isMobile ? 20 : 30 } 
+    ],
     onEvents: {
       'click': (params: any) => {
         if (context === 'top_products_by_revenue' || 
@@ -187,117 +215,133 @@ function getChartOptions(
             context === 'worst_products_by_revenue' || 
             context === 'delivery_by_neighborhood') 
         {
-          return; // Fim. Não faz drill-down.
+          return;
         }
         if (onChartClick && context) {
           const currentContext = { store_name: store_name };
-          onChartClick(context, params.name, currentContext);
+          onChartClick(context, params.name, currentContext);
         }
       }
     }
   };
 
-
   const pieOption = {
     color: COLOR_PALETTE,
-    title: { text: `Distribuição por ${dimensionKey}`, left: 'center' },
+    title: { 
+      text: `Distribuição por ${dimensionKey}`, 
+      left: 'center',
+      textStyle: {
+        fontSize: isMobile ? 14 : 18,
+      }
+    },
     tooltip: { 
       trigger: 'item',
+      confine: true,
       formatter: (param: any) => {
         const { name, value, percent } = param;
         return `${name}<br /><strong>${formatValue(value, metricKey)}</strong> (${percent}%)`;
       }
     },
-    legend: { orient: 'vertical', left: 'left' },
-    toolbox: { feature: { saveAsImage: { title: 'Salvar Imagem' } } },
+    legend: { 
+      orient: isMobile ? 'horizontal' : 'vertical', 
+      left: isMobile ? 'center' : 'left',
+      top: isMobile ? 'bottom' : 'middle',
+      type: 'scroll',
+      textStyle: {
+        fontSize: isMobile ? 10 : 12,
+      }
+    },
+    toolbox: { feature: { saveAsImage: { title: 'Salvar' } } },
     series: [
       {
         name: metricKey,
         type: 'pie',
-        radius: '50%',
+        radius: isMobile ? '45%' : '50%',
+        center: isMobile ? ['50%', '45%'] : ['50%', '50%'],
         data: data.map((row: any) => ({ 
           value: row[metricKey],
           name: row[dimensionKey],
         })),
         emphasis: {
-          itemStyle: {
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.5)'
+          }
+        },
+        label: {
+          fontSize: isMobile ? 10 : 12,
+        }
       }
     ],
-
     onEvents: {
       'click': (params: any) => {
-        // 1. Verifica se o "Pai" (VendasPorLojaView) passou a função
         if (context === 'top_products_by_revenue' || 
             context === 'sales_by_payment_type' || 
             context === 'top_products' || 
             context === 'worst_products_by_revenue' ||
             context === 'delivery_by_neighborhood') 
         {
-          return; // Fim. Não faz drill-down.
+          return;
         }
-        console.log(context)
         if (onChartClick && context) {
           const currentContext = { store_name: store_name };
-          onChartClick(context, params.name, currentContext);
+          onChartClick(context, params.name, currentContext);
         }
       }
     }
   };
 
-  if (data.length <= 13) {
-    return pieOption;
-  }
-  return barOption;
+  if (data.length <= 13) {
+    return pieOption;
+  }
+  return barOption;
 }
 
-// --- Define as Props que o componente espera ---
 interface DataDisplayProps {
-  reportData: ReportData | null;
-  isLoading: boolean;
-  error: string | null;
-  // A "prop" que o 'VendasPorLojaView' (o Pai) está passando
-  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void; 
+  reportData: ReportData | null;
+  isLoading: boolean;
+  error: string | null;
+  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void; 
   averageLineValue?: number;
 }
 
-// --- O componente agora RECEBE props ---
 export function DataDisplay({ reportData, isLoading, error, onChartClick, averageLineValue }: DataDisplayProps) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // (O 'if (isLoading)' agora usa a prop 'isLoading')
-  if (isLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>
-        <Spin tip="Carregando dados..." size="large" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-  // (O 'if (error)' está 100% CORRETO)
-  if (error) {
-    return <Alert message="Erro ao carregar relatório" description={error} type="error" showIcon />;
-  }
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>
+        <Spin tip="Carregando dados..." size="large" />
+      </div>
+    );
+  }
 
-  // (O 'if (!reportData)' está 100% CORRETO)
-  if (!reportData || reportData.data.length === 0) {
-    // O wrapper para consistência
-    return (
-       <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
-         <Alert message="Nenhum dado para exibir" description="Selecione um relatório no menu ao lado." type="info" />
-       </div>
-    );
-  }
+  if (error) {
+    return <Alert message="Erro ao carregar relatório" description={error} type="error" showIcon />;
+  }
+
+  if (!reportData || reportData.data.length === 0) {
+    return (
+       <div className="content-card">
+         <Alert message="Nenhum dado para exibir" description="Selecione um relatório no menu ao lado." type="info" />
+       </div>
+    );
+  }
 
   const columns = Object.keys(reportData.data[0]).map((key) => ({
     title: key.replace(/_/g, ' ').toUpperCase(),
     dataIndex: key,
     key: key,
-    
-    // --- CORREÇÃO DO SORTER ---
+    width: isMobile ? 120 : 'auto',
     sorter: (a: any, b: any) => {
       const valA = a[key];
       const valB = b[key];
@@ -325,7 +369,7 @@ export function DataDisplay({ reportData, isLoading, error, onChartClick, averag
     },
   }));
   
-  const chartOption = getChartOptions(reportData, onChartClick, averageLineValue);
+  const chartOption = getChartOptions(reportData, onChartClick, averageLineValue, isMobile);
 
   const tabItems: TabsProps['items'] = [
     {
@@ -336,7 +380,7 @@ export function DataDisplay({ reportData, isLoading, error, onChartClick, averag
         <ReactECharts
           echarts={echarts}
           option={chartOption}
-          style={{ height: '400px', width: '100%' }}
+          style={{ height: isMobile ? '350px' : '400px', width: '100%' }}
           notMerge={true}
           onEvents={(chartOption as any)?.onEvents}
         />
@@ -344,15 +388,19 @@ export function DataDisplay({ reportData, isLoading, error, onChartClick, averag
     },
     {
       key: '2',
-      label: 'Tabela de Dados (Completa)',
+      label: 'Tabela',
       children: (
         <Table
           columns={columns}
           dataSource={reportData.data}
           rowKey={(_, index) => `row-${index}`}
           bordered
-          size="small"
-          pagination={{ pageSize: 10 }}
+          size={isMobile ? "small" : "middle"}
+          pagination={{ 
+            pageSize: isMobile ? 5 : 10,
+            simple: isMobile,
+            showSizeChanger: !isMobile,
+          }}
           scroll={{ x: 'max-content' }}
         />
       ),
@@ -360,11 +408,12 @@ export function DataDisplay({ reportData, isLoading, error, onChartClick, averag
   ];
 
   return (
-    <div style={{ backgroundColor: '#ffffff', padding: 24, borderRadius: 8, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)' }}>
-      <Title level={3} style={{ marginTop: 0 }}>{reportData.title}</Title>
+    <div className="content-card">
+      <Title level={3} style={{ marginTop: 0, fontSize: isMobile ? '18px' : '24px' }}>
+        {reportData.title}
+      </Title>
       
       <Tabs defaultActiveKey="1" items={tabItems} />
-      
     </div>
   );
 }
