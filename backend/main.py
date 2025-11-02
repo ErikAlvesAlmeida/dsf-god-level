@@ -1,7 +1,16 @@
 import duckdb
+import os                 
+import psycopg2           
+import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
+from dotenv import load_dotenv 
+
+load_dotenv()
+POSTGRES_DB_URL = os.getenv("DATABASE_URL")
+if not POSTGRES_DB_URL:
+    print("ALERTA: DATABASE_URL do Postgres não encontrada no .env")
 
 # --- Configuração da API ---
 app = FastAPI(
@@ -356,6 +365,79 @@ async def get_sales_by_channel_detail(store_name: str, mes_ano: str):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao consultar o Data Mart: {str(e)}")
+
+@app.get("/api/v2/reports/customer_segmentation")
+async def get_customer_segmentation(
+    order_by_asc: bool = False,
+    at_risk: bool = False
+):
+    print(f"Buscando Clientes: order_by_asc={order_by_asc}, at_risk={at_risk}")
+    
+    order_clause = "ASC" if order_by_asc else "DESC"
+    
+    having_clause = ""
+    if at_risk:
+        # CORRIGIDO: Converte sale_created_at para TIMESTAMP antes de comparar
+        having_clause = "HAVING COUNT(sale_id) >= 3 AND MAX(sale_created_at::TIMESTAMP) < (NOW() - INTERVAL '30 days')"
+    
+    query_stats = f"""
+    SELECT
+        customer_id,
+        COUNT(sale_id) AS total_vendas,
+        MAX(DATE(sale_created_at)) AS ultima_compra_data
+    FROM fct_sales
+    WHERE customer_id IS NOT NULL
+    GROUP BY customer_id
+    {having_clause}
+    ORDER BY total_vendas {order_clause}
+    LIMIT 100;
+    """
+    
+    conn_duckdb = None
+    conn_postgres = None
+    
+    try:
+        conn_duckdb = duckdb.connect(database=DUCKDB_FILE, read_only=True)
+        stats_df = conn_duckdb.execute(query_stats).fetchdf()
+        
+        if stats_df.empty:
+            return []
+
+        customer_ids = tuple(stats_df['customer_id'].tolist())
+
+        if not POSTGRES_DB_URL:
+            raise HTTPException(status_code=500, detail="DATABASE_URL do Postgres não configurada")
+        
+        conn_postgres = psycopg2.connect(POSTGRES_DB_URL)
+        cur = conn_postgres.cursor()
+        
+        query_details = f"""
+        SELECT
+            id,
+            customer_name,
+            COALESCE(phone_number, email) AS contato
+        FROM customers
+        WHERE id IN %s; 
+        """
+        
+        cur.execute(query_details, (customer_ids,))
+        details_data = cur.fetchall()
+
+        details_df = pd.DataFrame(details_data, columns=['customer_id', 'nome_cliente', 'contato'])
+        
+        final_df = pd.merge(stats_df, details_df, on='customer_id')
+        
+        final_df = final_df[['nome_cliente', 'contato', 'total_vendas', 'ultima_compra_data']]
+        final_df['ultima_compra_data'] = final_df['ultima_compra_data'].astype(str)
+        
+        return final_df.to_dict(orient='records')
+
+    except Exception as e:
+        print(f"ERRO SQL: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar relatório de clientes: {str(e)}")
+    finally:
+        if conn_duckdb: conn_duckdb.close()
+        if conn_postgres: conn_postgres.close()
 # --- FIM DOS ENDPOINTS ---
 
 @app.get("/")

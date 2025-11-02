@@ -7,7 +7,8 @@ import {
   AppstoreOutlined, 
   ShoppingOutlined, 
   DollarOutlined, 
-  EnvironmentOutlined 
+  EnvironmentOutlined,
+  UsergroupAddOutlined
 } from '@ant-design/icons';
 import { useDashboardStore } from '../store/dashboardStore';
 
@@ -31,6 +32,7 @@ const menuItems: MenuProps['items'] = [
   { key: 'top_products', icon: <ShoppingOutlined />, label: 'Melhores Produtos' },
   { key: 'worst_products', icon: <ShoppingOutlined />, label: 'Piores Produtos' },
   { key: 'payment_types', icon: <DollarOutlined />, label: 'Formas de Pagamento' },
+  { key: 'customer_report', icon: <UsergroupAddOutlined />, label: 'Relatório de Clientes' },
   { 
     key: 'delivery', 
     icon: <EnvironmentOutlined />, 
@@ -46,13 +48,18 @@ const menuItems: MenuProps['items'] = [
 export function DashboardMenu() {
   const showFunilLojaView = useDashboardStore((state) => state.showFunilLojaView);
   const fetchGlobalReport = useDashboardStore((state) => state.fetchGlobalReport);
+  const fetchCustomerReport = useDashboardStore((state) => state.fetchCustomerReport);
 
   const handleClick: MenuProps['onClick'] = (e) => {
     if (e.key === 'vendas_por_loja') {
       // 1. Se clicou no "Funil", chama a ação do funil
       showFunilLojaView();
       
-    } else {
+    } else if (e.key === 'customer_report') {
+      // 2. (Correto) Chama a ação da Fase 16 (Clientes)
+      fetchCustomerReport(false, false); 
+    
+    } else {
       // 2. Senão, busca o relatório global
       const reportInfo = reportMap[e.key];
       if (reportInfo) {
@@ -67,7 +74,7 @@ export function DashboardMenu() {
       theme="light"
       onClick={handleClick}
       style={{ height: '100%', borderRight: 0 }}
-      defaultSelectedKeys={['sales_by_channel']} // Começa no funil
+      defaultSelectedKeys={['sales_by_channel']} // Começa nos canais
       defaultOpenKeys={['delivery']}
       items={menuItems} 
     />

@@ -5,7 +5,7 @@ import { DashboardMenu } from './components/DashboardMenu';
 import { DataDisplay } from './components/DataDisplay';
 import { KpiCards } from './components/KpiCards';
 import { VendasPorLojaView } from './components/VendasPorLojaView'; 
-
+import { CustomerReportView } from './components/CustomerReportView';
 
 const { Header, Content, Sider } = Layout;
 
@@ -47,10 +47,14 @@ function App() {
             {/* KPIs Globais (Sempre aparecem) */}
             <KpiCards kpiData={kpiData} isLoading={isLoadingKpis} />
             {currentView === 'funil_loja' ? (
-              // Visão 1: O seu "Funil de Vendas por Loja"
+              // Visão 1: O "Funil de Vendas por Loja"
               <VendasPorLojaView />
+            ) : currentView === 'relatorio_clientes' ? (
+              
+              // Visão 2: O seu "Relatório de Clientes"
+              <CustomerReportView />
             ) : (
-              // Visão 2: O "Relatório Global" (Vendas por Canal, etc.)
+              // Visão 3: O "Relatório Global" (Vendas por Canal, etc.)
               <DataDisplay 
                 reportData={globalReport}
                 isLoading={isLoadingGlobalReport}

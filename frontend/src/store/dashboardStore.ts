@@ -1,11 +1,10 @@
 // src/store/dashboardStore.ts
 import { create } from 'zustand';
-// (O seu 'types/analytics.ts' deve ter todos estes)
-import type { KpiData, ReportData, DataRow, StoreDetailData } from '../types/analytics'; 
+import type { KpiData, ReportData, DataRow } from '../types/analytics'; 
 
 const API_BASE_URL = 'http://localhost:8000/api/v2';
 
-// --- "MEMÓRIA" DO FUNIL (Isto está 100% CORRETO, NÃO MUDA) ---
+// --- "MEMÓRIA" DO FUNIL ---
 interface VendasPorLojaState {
   allStores: DataRow[];
   selectedStore: string | null;
@@ -18,43 +17,44 @@ interface VendasPorLojaState {
   isLoadingDetail: boolean;
 }
 
-// --- A NOVA INTERFACE GERAL (Fase 13) ---
-// (Este é o bloco que você substitui)
+interface CustomerReportState {
+  reportData: DataRow[] | null;
+  isLoading: boolean;
+  // Os filtros (switches)
+  orderByAsc: boolean; // false = Mais comprados, true = Menos comprados
+  atRiskOnly: boolean; // false = Todos, true = "Em Risco" (Não voltam há 30 dias)
+}
+
 interface DashboardState {
-  // Mantém os KPIs Globais (Correto)
+  // Mantém os KPIs Globais
   kpiData: KpiData | null;
   isLoadingKpis: boolean;
   error: string | null;
 
-  // --- MUDANÇA 1: Adiciona estado para "Roteamento" ---
-  // (Controla o que o App.tsx mostra: o seu "funil" OU um "relatório global")
-  currentView: 'funil_loja' | 'relatorio_global'; 
+  // (Controla o que o App.tsx mostra: o "funil" OU um "relatório global")
+  currentView: 'funil_loja' | 'relatorio_global' | 'relatorio_clientes'; 
 
-  // --- MUDANÇA 2: Adiciona "Memória" para os Relatórios Globais ---
   globalReport: ReportData | null; // O 'DataDisplay' global vai ler daqui
   isLoadingGlobalReport: boolean; // Loading para o relatório global
 
-  // "Memória" para o Funil de Loja (Correto, não muda)
+  // "Memória" para o Funil de Loja
   vendasPorLoja: VendasPorLojaState;
+  customerReport: CustomerReportState;
 
   // --- AS AÇÕES (Mapeadas para o fluxo) ---
   fetchKpis: () => Promise<void>;
   
-  // Ações do Funil (Corretas, não mudam)
+  // Ações do Funil 
   fetchStoreList: () => Promise<void>;
   fetchMonthlyReportForStore: (storeName: string) => Promise<void>;
   fetchDetailReportsForMonth: (mesAno: string) => Promise<void>;
-  // (A 'resetStoreSelection' será renomeada para 'showFunilLojaView' para clareza)
-  
-  // --- MUDANÇA 3: Ações para "mudar de visão" ---
-  showFunilLojaView: () => void; // (Substitui 'resetStoreSelection')
-  
-  // --- MUDANÇA 4: Re-adicionar o 'fetchGlobalReport' (para os outros itens do menu) ---
+
+  showFunilLojaView: () => void;
+
   fetchGlobalReport: (endpoint: string, title: string, params?: Record<string, any>) => Promise<void>;
   fetchDrilldownReport: (type: string, value: string, context?: Record<string, any>) => Promise<void>;
+  fetchCustomerReport: (orderByAsc: boolean, atRiskOnly: boolean) => Promise<void>;
 }
-
-// --- (Esta constante 'initialVendasPorLojaState' está 100% CORRETA, NÃO MUDA) ---
 const initialVendasPorLojaState: VendasPorLojaState = {
   allStores: [],
   selectedStore: null,
@@ -67,6 +67,12 @@ const initialVendasPorLojaState: VendasPorLojaState = {
   isLoadingDetail: false,
 };
 
+const initialCustomerReportState: CustomerReportState = {
+  reportData: null,
+  isLoading: false,
+  orderByAsc: false, // Começa mostrando "Mais Comprados"
+  atRiskOnly: false, // Começa mostrando "Todos"
+};
 // --- 2. O Início da Implementação ---
 export const useDashboardStore = create<DashboardState>((set, get) => ({
 
@@ -78,8 +84,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   globalReport: null,
   isLoadingGlobalReport: false,
   vendasPorLoja: initialVendasPorLojaState, // Carrega o estado inicial do seu funil
+  customerReport: initialCustomerReportState,
 
-  // --- A função fetchKpis (100% CORRETA, NÃO MUDA) ---
   fetchKpis: async () => {
     set({ isLoadingKpis: true });
     try {
@@ -289,4 +295,41 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ error: err.message, vendasPorLoja: { ...get().vendasPorLoja, isLoadingDetail: false } });
     }
   },
+  fetchCustomerReport: async (orderByAsc: boolean, atRiskOnly: boolean) => {
+    // 1. Liga o loading e salva os filtros (switches)
+    set(state => ({
+      currentView: 'relatorio_clientes',
+      customerReport: {
+        ...state.customerReport,
+        isLoading: true,
+        orderByAsc: orderByAsc,
+        atRiskOnly: atRiskOnly,
+      }
+    }));
+    
+    try {
+      // 2. Constrói a URL com os parâmetros dos switches
+      const params = new URLSearchParams({
+        order_by_asc: String(orderByAsc),
+        at_risk: String(atRiskOnly)
+      });
+      const url = `${API_BASE_URL}/reports/customer_segmentation?${params.toString()}`;
+      
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Erro ao buscar relatório de clientes');
+      const data: DataRow[] = await res.json();
+      
+      // 3. Salva os dados no 'customerReport'
+      set(state => ({
+        customerReport: {
+          ...state.customerReport,
+          reportData: data,
+          isLoading: false
+        }
+      }));
+      
+    } catch (err: any) {
+      set({ error: err.message, customerReport: { ...get().customerReport, isLoading: false } });
+    }
+  }
 }));
