@@ -42,11 +42,11 @@ Sale
     └── DeliveryAddress (com lat/long)
 ```
 
-**Schema completo**: [DADOS.md](./DADOS.md)
+**Schema completo**: [DADOS.md](./initial_information/DADOS.md)
 
 ## Próximos Passos
 
-1. **Entenda o problema**: Leia [PROBLEMA.md](./PROBLEMA.md)
+1. **Entenda o problema**: Leia [PROBLEMA.md](./initial_information/PROBLEMA.md)
 2. **Explore os dados**: Rode queries, veja padrões
 3. **Desenhe solução**: Arquitetura, stack, UX
 4. **Implemente**: Resolva o problema!
