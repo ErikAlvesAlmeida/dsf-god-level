@@ -377,8 +377,11 @@ async def get_customer_segmentation(
     
     having_clause = ""
     if at_risk:
-        # CORRIGIDO: Converte sale_created_at para TIMESTAMP antes de comparar
-        having_clause = "HAVING COUNT(sale_id) >= 3 AND MAX(sale_created_at::TIMESTAMP) < (NOW() - INTERVAL '30 days')"
+        having_clause = """
+        HAVING 
+            COUNT(sale_id) >= 3 
+            AND MAX(DATE(sale_created_at)) < CURRENT_DATE - INTERVAL '30 days'
+        """
     
     query_stats = f"""
     SELECT
@@ -411,13 +414,13 @@ async def get_customer_segmentation(
         conn_postgres = psycopg2.connect(POSTGRES_DB_URL)
         cur = conn_postgres.cursor()
         
-        query_details = f"""
+        query_details = """
         SELECT
             id,
             customer_name,
             COALESCE(phone_number, email) AS contato
         FROM customers
-        WHERE id IN %s; 
+        WHERE id IN %s;
         """
         
         cur.execute(query_details, (customer_ids,))
