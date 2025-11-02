@@ -51,7 +51,7 @@ async def get_kpi_summary():
 @app.get("/api/v2/data/stores_list")
 async def get_stores_list():
     """
-    (Fase 12) Retorna uma lista simples de todos os nomes de lojas.
+    Retorna uma lista simples de todos os nomes de lojas.
     Para o seu novo 'Select-box'.
     """
     query = """

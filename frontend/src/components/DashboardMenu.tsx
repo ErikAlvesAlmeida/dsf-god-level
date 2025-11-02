@@ -22,12 +22,12 @@ const reportMap: Record<string, { endpoint: string, title: string, params?: Reco
 
 const menuItems: MenuProps['items'] = [
   // Esta é a 'key' do Funil 
-  { key: 'vendas_por_loja', icon: <ShopOutlined />, label: 'Vendas por Loja (Funil)' }, 
+  { key: 'vendas_por_loja', icon: <ShopOutlined />, label: 'Vendas por Loja' }, 
   
   // Estas são as 'keys' dos Relatórios Globais
-  { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal (Global)' },
-  { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês (Global)' },
-  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos (Global)' },
+  { key: 'sales_by_channel', icon: <AppstoreOutlined />, label: 'Vendas por Canal' },
+  { key: 'sales_by_month', icon: <AreaChartOutlined />, label: 'Faturamento por Mês' },
+  { key: 'top_products', icon: <ShoppingOutlined />, label: 'Top Produtos' },
   { key: 'payment_types', icon: <DollarOutlined />, label: 'Formas de Pagamento' },
   { 
     key: 'delivery', 
@@ -65,7 +65,7 @@ export function DashboardMenu() {
       theme="light"
       onClick={handleClick}
       style={{ height: '100%', borderRight: 0 }}
-      defaultSelectedKeys={['vendas_por_loja']} // Começa no funil
+      defaultSelectedKeys={['sales_by_channel']} // Começa no funil
       defaultOpenKeys={['delivery']}
       items={menuItems} 
     />

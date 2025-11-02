@@ -164,10 +164,15 @@ function getChartOptions(
 
     onEvents: {
       'click': (params: any) => {
+        if (context === 'top_products' || 
+            context === 'payment_types' || 
+            context === 'delivery_by_neighborhood') 
+        {
+          return; // Fim. Não faz drill-down.
+        }
         if (onChartClick && context) {
-          // 2. Devolve o "contexto" do gráfico (ex: 'sales_by_month_for_store')
-          //    e o "valor" (ex: '2025-05')
-          onChartClick(context, params.name);
+          const currentContext = { store_name: store_name };
+          onChartClick(context, params.name, currentContext);
         }
       }
     }
@@ -208,16 +213,21 @@ function getChartOptions(
     onEvents: {
       'click': (params: any) => {
         // 1. Verifica se o "Pai" (VendasPorLojaView) passou a função
+        if (context === 'top_products' || 
+            context === 'payment_types' || 
+            context === 'delivery_by_neighborhood') 
+        {
+          return; // Fim. Não faz drill-down.
+        }
         if (onChartClick && context) {
-          // 2. Devolve o "contexto" do gráfico (ex: 'sales_by_month_for_store')
-          //    e o "valor" (ex: '2025-05')
-          onChartClick(context, params.name);
+          const currentContext = { store_name: store_name };
+          onChartClick(context, params.name, currentContext);
         }
       }
     }
   };
 
-  if (data.length <= 7) {
+  if (data.length <= 13) {
     return pieOption;
   }
   return barOption;
@@ -229,17 +239,13 @@ interface DataDisplayProps {
   isLoading: boolean;
   error: string | null;
   // A "prop" que o 'VendasPorLojaView' (o Pai) está passando
-  onChartClick?: (type: string, value: string) => void; 
+  onChartClick?: (type: string, value: string, context?: Record<string, any>) => void; 
 }
 
 // --- O componente agora RECEBE props ---
 export function DataDisplay({ reportData, isLoading, error, onChartClick }: DataDisplayProps) {
 
-  // --- DELETADO: Removemos TODAS as chamadas ao useDashboardStore ---
-  // (Este componente não fala mais com o store,
-  // ele só recebe props. Isso MATA o loop infinito.)
-
-  // (O 'if (isLoading)' agora usa a prop 'isLoading' - 100% CORRETO)
+  // (O 'if (isLoading)' agora usa a prop 'isLoading')
   if (isLoading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px', width: '100%' }}>

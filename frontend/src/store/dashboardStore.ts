@@ -51,6 +51,7 @@ interface DashboardState {
   
   // --- MUDANÇA 4: Re-adicionar o 'fetchGlobalReport' (para os outros itens do menu) ---
   fetchGlobalReport: (endpoint: string, title: string, params?: Record<string, any>) => Promise<void>;
+  fetchDrilldownReport: (type: string, value: string, context?: Record<string, any>) => Promise<void>;
 }
 
 // --- (Esta constante 'initialVendasPorLojaState' está 100% CORRETA, NÃO MUDA) ---
@@ -142,6 +143,50 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       set({ error: err.message, isLoadingGlobalReport: false });
     }
   },
+
+  fetchDrilldownReport: async (type: string, value: string, context: Record<string, any> = {}) => {
+    // Esta função é chamada pela VISÃO GLOBAL
+    // Ela vai RECARREGAR o 'globalReport' com os dados do drilldown
+    set({ isLoadingGlobalReport: true, error: null }); // Usa o loading global
+    
+    let url = '';
+    let title = '';
+    let newContext = '';
+    // (Pega o 'store_name' do contexto, embora seja 'null' no global)
+    let storeName = context.store_name || null; 
+
+    // O 'type' aqui é o 'context' que o DataDisplay passou
+    if (type === 'sales_by_month') { 
+      title = `Faturamento Diário (${value})`;
+      url = `${API_BASE_URL}/reports/sales_by_day_stacked?mes_ano=${value}`;
+      newContext = 'daily_stacked_histogram';
+      
+    } else if (type === 'sales_by_channel') {
+      title = `Top Produtos (Canal: ${value})`;
+      url = `${API_BASE_URL}/reports/top_products_by_channel?channel_name=${encodeURIComponent(value)}`;
+      newContext = 'top_products';
+    }
+    // (Adicione mais 'else if' aqui para outros drilldowns globais)
+    
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Erro no drilldown global');
+      const data: DataRow[] = await res.json();
+      
+      set({ 
+        globalReport: { // <-- Salva no 'globalReport'
+          data, 
+          title, 
+          context: newContext,
+          store_name: storeName // (será 'null', o que é correto)
+        },
+        isLoadingGlobalReport: false 
+      });
+      
+    } catch (err: any) {
+      set({ error: err.message, isLoadingGlobalReport: false });
+    }
+  },
 
   // --- Ação para "trocar" para o Funil de Loja ---
   showFunilLojaView: () => {

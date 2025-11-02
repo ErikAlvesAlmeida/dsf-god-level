@@ -23,7 +23,7 @@ function App() {
 
   // --- useEffect (Carrega SÓ os KPIs Globais) ---
   const fetchGlobalReport = useDashboardStore((state) => state.fetchGlobalReport);
-  
+  const fetchDrilldownReport = useDashboardStore((state) => state.fetchDrilldownReport);
   // --- useEffect (Carrega KPIs E o Relatório Global Padrão) ---
   useEffect(() => {
     fetchKpis();
@@ -55,6 +55,7 @@ function App() {
                 reportData={globalReport}
                 isLoading={isLoadingGlobalReport}
                 error={error}
+                onChartClick={fetchDrilldownReport}
               />
             )}
           </Content>
