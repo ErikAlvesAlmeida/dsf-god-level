@@ -21,10 +21,10 @@ node --version && npm --version
 ```
 #### Saída esperada:
 ```
-v18.18.0
+v20.1.0
 9.8.1
 ```
-(Nota: Versões mais recentes (v18+ ou v20+) são recomendadas.)
+(Nota: Versões mais recentes (v20+) são recomendadas.)
 
 ### Verifique a instalação do Python:
 ```bash
