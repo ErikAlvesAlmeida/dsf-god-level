@@ -85,6 +85,6 @@ dsf-god-level/
 ├── Dockerfile               # Dockerfile para o 'data-generator'
 ├── generate_data.py         # O script original para popular o Postgres
 ├── QUICKSTART.md            # Markdown mostrando o passo a passo de como rodar o projeto
-├── README.md                # (Onde isto será colado)
+├── README.md                # (informações iniciais)
 └── requirements.txt         # Dependências Python (só para o 'data-generator')
 ```
