@@ -2,6 +2,40 @@
 
 ATENÇÃO: essa é uma sugestão de setup, não é obrigatório que se rode dessa maneira. O script base para geração de dados está em ./generate_data.py.
 
+## Antes de tudo, verifique se você possui esses itens instalados no seu computador:
+
+### Verifique a instalação do Docker:
+
+```bash
+docker --version && docker compose version
+```
+#### Saída esperada:
+```
+Docker version 20.10.17, build ...
+Docker Compose version v2.10.2, build ...
+```
+
+### Verifique a instalação do Node:
+```bash
+node --version && npm --version
+```
+#### Saída esperada:
+```
+v18.18.0
+9.8.1
+```
+(Nota: Versões mais recentes (v18+ ou v20+) são recomendadas.)
+
+### Verifique a instalação do Python:
+```bash
+python3 --version
+```
+#### Saída esperada:
+```
+Python 3.10.12
+```
+(Nota: Qualquer versão do Python 3.9+ (ex: 3.10, 3.11) funcionará, já que foi o que usamos no Dockerfile e no venv.)
+
 ## Setup Completo
 
 ```bash

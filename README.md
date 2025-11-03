@@ -1,5 +1,8 @@
 # 🏆 God Level Coder Challenge
 
+## Leia o QUICKSTART.MD para ter as informações necessárias para rodar o projeto
+[QUICKSTART.md](./initial_information/QUICKSTART.md)
+
 ## O Problema
 
 Donos de restaurantes gerenciam operações complexas através de múltiplos canais (presencial, iFood, Rappi, app próprio). Eles têm dados de **vendas, produtos, clientes e operações**, mas não conseguem extrair insights personalizados para tomar decisões de negócio.
