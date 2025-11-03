@@ -1,7 +1,7 @@
 # 🏆 God Level Coder Challenge
 
 ## Leia o QUICKSTART.MD para ter as informações necessárias para rodar o projeto
-[QUICKSTART.md](./initial_information/QUICKSTART.md)
+[QUICKSTART.md](./QUICKSTART.md)
 
 ## O Problema
 
@@ -43,7 +43,7 @@ Uma plataforma onde um dono de restaurante possa:
 | [DADOS.md](./initial_information/DADOS.md) | Schema completo, padrões, volume de dados |
 | [AVALIACAO.md](./initial_information/AVALIACAO.md) | Como avaliaremos sua solução |
 | [FAQ.md](./initial_information/FAQ.md) | Perguntas frequentes |
-| [QUICKSTART.md](./initial_information/QUICKSTART.md) | Tutorial rápido para **RODAR O PROJETO** |
+| [QUICKSTART.md](./QUICKSTART.md) | Tutorial rápido para **RODAR O PROJETO** |
 
 ## Estrutura final do projeto
 ```
