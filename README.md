@@ -43,6 +43,7 @@ Uma plataforma onde um dono de restaurante possa:
 | [QUICKSTART.md](./initial_information/QUICKSTART.md) | Tutorial rápido para **RODAR O PROJETO** |
 
 ## Estrutura final do projeto
+```
 dsf-god-level/
 │
 ├── backend/
@@ -86,3 +87,4 @@ dsf-god-level/
 ├── QUICKSTART.md            # Markdown mostrando o passo a passo de como rodar o projeto
 ├── README.md                # (Onde isto será colado)
 └── requirements.txt         # Dependências Python (só para o 'data-generator')
+```
