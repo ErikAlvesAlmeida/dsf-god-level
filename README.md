@@ -6,9 +6,9 @@ Donos de restaurantes gerenciam operações complexas através de múltiplos can
 
 Ferramentas como Power BI são genéricas demais. Dashboards fixos não respondem perguntas específicas. **Como empoderar donos de restaurantes a explorarem seus próprios dados?**
 
-## Seu Desafio
+## O Desafio
 
-Construa uma solução que permita donos de restaurantes **criarem suas próprias análises** sobre seus dados operacionais. Pense: "Power BI para restaurantes" ou "Metabase específico para food service".
+Construir uma solução que permita donos de restaurantes **criarem suas próprias análises** sobre seus dados operacionais. Pense: "Power BI para restaurantes" ou "Metabase específico para food service".
 
 ### O que esperamos
 
@@ -36,44 +36,53 @@ Uma plataforma onde um dono de restaurante possa:
 
 | Documento | Descrição |
 |-----------|-----------|
-| [PROBLEMA.md](./PROBLEMA.md) | Contexto detalhado, persona Maria, dores do usuário |
-| [DADOS.md](./DADOS.md) | Schema completo, padrões, volume de dados |
-| [AVALIACAO.md](./AVALIACAO.md) | Como avaliaremos sua solução |
-| [FAQ.md](./FAQ.md) | Perguntas frequentes |
-| [QUICKSTART.md](./QUICKSTART.md) | Tutorial rápido para começar o desafio |
+| [PROBLEMA.md](./initial_information/PROBLEMA.md) | Contexto detalhado, persona Maria, dores do usuário |
+| [DADOS.md](./initial_information/DADOS.md) | Schema completo, padrões, volume de dados |
+| [AVALIACAO.md](./initial_information/AVALIACAO.md) | Como avaliaremos sua solução |
+| [FAQ.md](./initial_information/FAQ.md) | Perguntas frequentes |
+| [QUICKSTART.md](./initial_information/QUICKSTART.md) | Tutorial rápido para **RODAR O PROJETO** |
 
-## Avaliação
-
-**Não** estamos avaliando se você seguiu instruções específicas.  
-**Sim** estamos avaliando:
-- Pensamento arquitetural e decisões técnicas
-- Qualidade da solução para o problema do usuário
-- Performance e escala
-- UX e usabilidade
-- Metodologia de trabalho e entrega
-
-
-## Prazo
-
-Até 03/11/2025 às 23:59.
-
-## Submissão
-
-Mande um email para gsilvestre@arcca.io
-
-Com:
-- Link do repositório (público ou nos dê acesso)
-- Link do vídeo demo (5-10 min)
-- Link do deploy (opcional mas valorizado)
-- Documento de decisões arquiteturais
-
-## Suporte
-- 💬 **Discord**: https://discord.gg/z8pVH26j
-- 📧 **Email**: gsilvestre@arcca.io
-- 📧 **Telefone**: (11) 93016 - 3509
-
----
-
-**Não queremos que você adivinhe o que queremos. Queremos ver como VOCÊ resolveria este problema.**
-
-_Nola • 2025_
+## Estrutura final do projeto
+dsf-god-level/
+│
+├── backend/
+│   ├── .env                   # (Não versionado) Credenciais do Postgres (DATABASE_URL)
+│   ├── analytics.duckdb       # (Não versionado) O Data Mart OLAP (resultado do ETL)
+│   ├── etl_rapido.py          # Script de ETL com limitação de dados (Postgres -> DuckDB)
+│   ├── etl.py                 # (Otimizado v4) Script de ETL (Postgres -> DuckDB)
+│   ├── main.py                # A API FastAPI (Backend "Curado")
+│   ├── requirements.txt       # Dependências Python (fastapi, uvicorn, duckdb, psycopg2)
+│   └── venv/                  # (Não versionado) Ambiente virtual Python
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/        # --- O CORAÇÃO DA UI ---
+│   │   │   ├── App.tsx        # O "Pai" principal: Roteador de Visão e carregador de KPIs
+│   │   │   ├── DashboardMenu.tsx # O Menu lateral ("Gatilho")
+│   │   │   ├── KpiCards.tsx      # Componente "Burro" (Reutilizável) para os 4 KPIs
+│   │   │   ├── DataDisplay.tsx   # Componente "Burro" (Reutilizável) para Gráficos/Tabelas
+│   │   │   ├── VendasPorLojaView.tsx # O "Pai" do Funil de Loja 
+│   │   │   └── CustomerReportView.tsx # O "Pai" do Relatório de Clientes 
+│   │   │
+│   │   ├── store/
+│   │   │   └── dashboardStore.ts # O "Cérebro" (Zustand)
+│   │   │
+│   │   ├── types/
+│   │   │   └── analytics.ts    # Os "Contratos" (Interfaces KpiData, ReportData, etc.)
+│   │   │
+│   │   ├── index.css          # Estilos globais (inclui o reset do Ant Design)
+│   │   ├── main.tsx           # O ponto de entrada do React
+│   │   └── ... (outros arquivos de setup: vite-env.d.ts)
+│   │
+│   ├── index.html             # O HTML raiz que carrega o React
+│   ├── package.json           # Dependências JS (react, antd, echarts, zustand)
+│   ├── tsconfig.json          # Configuração do TypeScript
+│   └── vite.config.ts         # Configuração do Vite (Frontend server)
+│
+├── database-schema.sql      # O Schema SQL original (corrigido com o INSERT da 'brand')
+├── docker-compose.yml       # Orquestração do Docker (Postgres, pgAdmin, Data-Generator)
+├── Dockerfile               # Dockerfile para o 'data-generator'
+├── generate_data.py         # O script original para popular o Postgres
+├── QUICKSTART.md            # Markdown mostrando o passo a passo de como rodar o projeto
+├── README.md                # (Onde isto será colado)
+└── requirements.txt         # Dependências Python (só para o 'data-generator')

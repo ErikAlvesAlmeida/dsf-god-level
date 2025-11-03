@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import type { KpiData, ReportData, DataRow } from '../types/analytics'; 
 
-const API_BASE_URL = 'http://localhost:8000/api/v2';
+const API_BASE_URL = 'http://localhost:8001/api/v2';
 
 // --- "MEMÓRIA" DO FUNIL ---
 interface VendasPorLojaState {
